@@ -729,8 +729,16 @@ class WallpaperPage(Gtk.ScrolledWindow):
 
 # ------------------------------------------------------------------ botões estilo macOS (CSS do GTK)
 TL_MARK = "/* watermelon: botões macOS */"
-TL_FILES = {"gtk-4.0": "/usr/share/watermelon/gtk/traffic-lights-gtk4.css",
-            "gtk-3.0": "/usr/share/watermelon/gtk/traffic-lights-gtk3.css"}
+
+
+def _tl_css(name):
+    """Arquivo do sistema; se ainda não existir (rodando direto do repositório), o do repositório."""
+    system = f"/usr/share/watermelon/gtk/{name}"
+    repo = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "share", "watermelon", "gtk", name)
+    return system if os.path.exists(system) or not os.path.exists(repo) else os.path.realpath(repo)
+
+
+TL_FILES = {"gtk-4.0": _tl_css("traffic-lights-gtk4.css"), "gtk-3.0": _tl_css("traffic-lights-gtk3.css")}
 
 
 def _gtk_css(ver):

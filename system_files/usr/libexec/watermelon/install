@@ -32,20 +32,116 @@ flatpak_ensure() {  # flatpak_ensure <app-id> <nome amigável>
 }
 
 # ------------------------------------------------------------------ Windows
+BOTTLE="Apps"
+BOTTLE_ROOT="$HOME/.var/app/com.usebottles.bottles/data/bottles/bottles/$BOTTLE"
+BOTTLES_CLI=(flatpak run --command=bottles-cli com.usebottles.bottles)
+
+win_programs() {  # id<TAB>nome<TAB>pasta<TAB>executável de cada programa que o Bottles conhece
+  "${BOTTLES_CLI[@]}" -j programs -b "$BOTTLE" 2>/dev/null | tail -1 \
+    | jq -r '.[] | [.id, .name, .folder, .executable] | @tsv' 2>/dev/null || true
+}
+
+# Programas .NET 5+ trazem um *.runtimeconfig.json dizendo qual runtime precisam.
+# Se o runtime não estiver no ambiente, baixa o oficial da Microsoft e instala em silêncio.
+ensure_dotnet() {  # ensure_dotnet <arquivo marcador: só olha o que foi instalado depois dele>
+  local marker=$1 cfg name version major kind dir exe
+  local cache="$HOME/.cache/watermelon/dotnet"
+  while IFS= read -r -d '' cfg; do
+    while read -r name version; do
+      [[ -n $name && -n $version ]] || continue
+      major=${version%%.*}
+      dir="$BOTTLE_ROOT/drive_c/Program Files/dotnet/shared/$name"
+      compgen -G "$dir/$major.*" >/dev/null && continue
+      case $name in
+        Microsoft.WindowsDesktop.App) kind=windowsdesktop-runtime ;;
+        Microsoft.NETCore.App)        kind=dotnet-runtime ;;
+        Microsoft.AspNetCore.App)     kind=aspnetcore-runtime ;;
+        *) continue ;;
+      esac
+      info "o programa precisa do .NET $major ($name): instalando (só acontece uma vez)"
+      mkdir -p "$cache"
+      exe="$cache/$kind-$major-win-x64.exe"
+      [[ -s $exe ]] || curl -fL --progress-bar -o "$exe" "https://aka.ms/dotnet/$major.0/$kind-win-x64.exe"
+      flatpak override --user --filesystem="$cache":ro com.usebottles.bottles
+      "${BOTTLES_CLI[@]}" run -b "$BOTTLE" -e "$exe" /install /quiet /norestart >/dev/null 2>&1 || true
+      if compgen -G "$dir/$major.*" >/dev/null; then
+        ok ".NET $major instalado"
+      else
+        warn "não confirmei o .NET $major; se o programa não abrir, rode: melon install $exe"
+      fi
+    done < <(jq -r '.runtimeOptions | (.frameworks // [.framework]) | .[] | "\(.name) \(.version)"' "$cfg" 2>/dev/null | sort -r)
+  done < <(find "$BOTTLE_ROOT/drive_c" -name '*.runtimeconfig.json' -newer "$marker" -not -ipath '*/windows/*' -print0 2>/dev/null)
+}
+
+win_icon() {  # win_icon <id> <exe>: extrai o ícone do .exe; imprime o nome/caminho do ícone
+  local id=$1 exe=$2 ico png idx
+  ico="$HOME/.var/app/com.usebottles.bottles/cache/watermelon-$id.ico"
+  png="$HOME/.local/share/icons/hicolor/256x256/apps/bottles-$id.png"
+  mkdir -p "$(dirname "$ico")" "$(dirname "$png")"
+  if ! flatpak run --command=icoextract com.usebottles.bottles "$exe" "$ico" >/dev/null 2>&1; then
+    echo applications-games
+    return
+  fi
+  if command -v magick >/dev/null; then
+    idx=$(magick identify -format '%p %w\n' "$ico" 2>/dev/null | sort -k2 -n | tail -1 | cut -d' ' -f1)
+    if magick "$ico[${idx:-0}]" -resize 256x256 "$png" 2>/dev/null; then
+      rm -f "$ico"
+      echo "bottles-$id"
+      return
+    fi
+  fi
+  echo "$ico"
+}
+
+win_shortcut() {  # win_shortcut <id> <nome> <pasta> <exe>
+  local id=$1 name=$2 folder=$3 exe=$4 icon
+  icon=$(win_icon "$id" "$folder/$exe")
+  printf '%s\n' \
+    '[Desktop Entry]' \
+    'Type=Application' \
+    "Name=$name" \
+    "Comment=Programa do Windows (roda pelo Bottles, ambiente \"$BOTTLE\")" \
+    "Exec=flatpak run --command=bottles-cli com.usebottles.bottles run -b $BOTTLE --program-id $id" \
+    "Icon=$icon" \
+    'Categories=Wine;' \
+    "StartupWMClass=${exe,,}" > "$APPS_DIR/bottles-$id.desktop"
+  ok "atalho no menu: $name"
+}
+
 install_windows() {
-  local BOTTLE="Apps"
   step "Programa do Windows: $NAME"
   flatpak_ensure com.usebottles.bottles "Bottles (compatibilidade com Windows)"
   # Dá ao Bottles acesso de leitura à pasta do instalador
   flatpak override --user --filesystem="$(dirname "$FILE")":ro com.usebottles.bottles
-  local cli=(flatpak run --command=bottles-cli com.usebottles.bottles)
-  if ! "${cli[@]}" list bottles 2>/dev/null | grep -q "$BOTTLE"; then
+  if ! "${BOTTLES_CLI[@]}" list bottles 2>/dev/null | grep -q "$BOTTLE"; then
     info "criando o ambiente Windows \"$BOTTLE\" (leva um minuto na primeira vez)"
-    "${cli[@]}" new --bottle-name "$BOTTLE" --environment application
+    "${BOTTLES_CLI[@]}" new --bottle-name "$BOTTLE" --environment application
   fi
+  local marker before
+  marker=$(mktemp)
+  before=$(win_programs | cut -f1)
   info "abrindo o instalador; siga as telas dele normalmente"
-  "${cli[@]}" run -b "$BOTTLE" -e "$FILE"   # o Bottles reconhece .exe e .msi
-  ok "pronto: o programa fica no app Bottles, e você pode criar atalho no menu por lá"
+  "${BOTTLES_CLI[@]}" run -b "$BOTTLE" -e "$FILE" >/dev/null 2>&1 || true   # o Bottles reconhece .exe e .msi
+
+  ensure_dotnet "$marker"
+  rm -f "$marker"
+
+  # atalho no menu para cada programa novo (sem desinstaladores, manuais etc.)
+  local n=0 id name folder exe
+  while IFS=$'\t' read -r id name folder exe; do
+    [[ -n $id ]] || continue
+    grep -qxF "$id" <<<"$before" && continue
+    [[ ${exe,,} == *.exe ]] || continue
+    [[ ${name,,} =~ unins|uninstall|desinstal|readme|leia-me|manual|help|ajuda ]] && continue
+    win_shortcut "$id" "$name" "$folder" "$exe"
+    n=$((n+1))
+  done < <(win_programs)
+  update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+  if ((n)); then
+    ok "pronto: abra pelo menu de aplicativos (Super + Espaço)"
+  else
+    ok "pronto: se o programa não apareceu no menu, abra pelo app Bottles"
+  fi
 }
 
 # ------------------------------------------------------------------ Android

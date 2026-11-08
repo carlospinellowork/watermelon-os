@@ -34,6 +34,13 @@ if [ ! -f "$STATE/traffic-lights.done" ]; then
   touch "$STATE/traffic-lights.done"
 fi
 
+# Spotify pelo X11: no Wayland ele desenha uma barra de título própria (azul, fora do tema).
+# Pelo X11 o GNOME desenha a barra do sistema, com os botões 🔴🟡🟢.
+if [ ! -f "$STATE/spotify-x11.done" ]; then
+  flatpak override --user --nosocket=wayland --socket=x11 com.spotify.Client 2>/dev/null || true
+  touch "$STATE/spotify-x11.done"
+fi
+
 # Cache de exemplos do tldr (tealdeer)
 command -v tldr >/dev/null 2>&1 && tldr --update >/dev/null 2>&1 || true
 
