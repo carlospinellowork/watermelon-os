@@ -1,0 +1,9 @@
+{
+  "uuid": "watermelon-arc-dock@watermelon.os",
+  "name": "Dock em Arco",
+  "description": "Dock do WatermelonOS na lateral da tela: encoste o mouse na borda e os apps se abrem em arco.",
+  "shell-version": ["50", "51", "52"],
+  "settings-schema": "org.gnome.shell.extensions.watermelon-arc-dock",
+  "url": "https://github.com/carlospinellowork/watermelon-os",
+  "version": 1
+}

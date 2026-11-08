@@ -48,6 +48,9 @@ cp -r "$tmp/macOS" "$tmp/macOS-White" /usr/share/icons/
 chmod -R a+rX /usr/share/icons/macOS /usr/share/icons/macOS-White
 rm -rf "$tmp"
 
+# ---------------------------------------------------------------- Dock em Arco (extensão própria, vem em system_files)
+glib-compile-schemas /usr/share/gnome-shell/extensions/watermelon-arc-dock@watermelon.os/schemas
+
 # ---------------------------------------------------------------- AirDrop com o celular (GSConnect)
 firewall-offline-cmd --add-service=kdeconnect 2>/dev/null \
   || firewall-offline-cmd --add-port=1714-1764/tcp --add-port=1714-1764/udp || true

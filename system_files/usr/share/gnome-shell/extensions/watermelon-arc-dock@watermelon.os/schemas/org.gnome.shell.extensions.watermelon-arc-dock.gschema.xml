@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.watermelon-arc-dock" path="/org/gnome/shell/extensions/watermelon-arc-dock/">
+    <key name="side" type="s">
+      <choices><choice value="left"/><choice value="right"/></choices>
+      <default>'left'</default>
+      <summary>Borda da tela onde o arco abre</summary>
+    </key>
+    <key name="icon-size" type="i">
+      <range min="32" max="72"/>
+      <default>48</default>
+      <summary>Tamanho dos ícones</summary>
+    </key>
+    <key name="show-running" type="b">
+      <default>true</default>
+      <summary>Mostrar também os apps abertos que não estão nos favoritos</summary>
+    </key>
+  </schema>
+</schemalist>

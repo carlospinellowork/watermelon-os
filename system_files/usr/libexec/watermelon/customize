@@ -248,6 +248,57 @@ def install_entry(entry):
         return install_from_dir(src, entry["kind"], only=entry["provides"])
 
 
+
+# ------------------------------------------------------------------ extensões do shell
+ARC_UUID = "watermelon-arc-dock@watermelon.os"
+DOCK_UUID = "dash-to-dock@micxgx.gmail.com"
+
+
+def extension_dir(uuid):
+    for base in (os.path.join(GLib.get_user_data_dir(), "gnome-shell", "extensions"),
+                 *[os.path.join(d, "gnome-shell", "extensions") for d in GLib.get_system_data_dirs()]):
+        if os.path.isdir(os.path.join(base, uuid)):
+            return os.path.join(base, uuid)
+    return None
+
+
+def arc_settings():
+    """Configurações do Dock em Arco (o schema fica dentro da pasta da extensão)."""
+    d = extension_dir(ARC_UUID)
+    if not d or not os.path.isdir(os.path.join(d, "schemas")):
+        return None
+    try:
+        src = Gio.SettingsSchemaSource.new_from_directory(os.path.join(d, "schemas"),
+                                                          Gio.SettingsSchemaSource.get_default(), False)
+    except GLib.Error:
+        return None
+    schema = src.lookup("org.gnome.shell.extensions.watermelon-arc-dock", False)
+    return Gio.Settings.new_full(schema, None, None) if schema else None
+
+
+def extension_enabled(uuid):
+    shell = Gio.Settings.new("org.gnome.shell")
+    return uuid in shell.get_strv("enabled-extensions") and uuid not in shell.get_strv("disabled-extensions")
+
+
+def set_extension(uuid, on):
+    """Liga/desliga pelo próprio GNOME Shell (efeito na hora); se não der, ajusta as listas do dconf."""
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+        bus.call_sync("org.gnome.Shell.Extensions", "/org/gnome/Shell/Extensions", "org.gnome.Shell.Extensions",
+                      "EnableExtension" if on else "DisableExtension", GLib.Variant("(s)", (uuid,)),
+                      None, 0, 5000, None)
+        return
+    except GLib.Error:
+        pass
+    shell = Gio.Settings.new("org.gnome.shell")
+    en = [u for u in shell.get_strv("enabled-extensions") if u != uuid]
+    dis = [u for u in shell.get_strv("disabled-extensions") if u != uuid]
+    (en if on else dis).append(uuid)
+    shell.set_strv("enabled-extensions", en)
+    shell.set_strv("disabled-extensions", dis)
+
+
 # ------------------------------------------------------------------ interface
 class ThemePage(Gtk.ScrolledWindow):
     """Página com os temas instalados e o catálogo para baixar."""
@@ -454,31 +505,71 @@ class BarPage(Adw.PreferencesPage):
             bar.add(sw)
         self.add(bar)
 
-        # dock
+        # dock: Dash to Dock (embaixo/lados) ou o Dock em Arco do WatermelonOS
         dock = settings("org.gnome.shell.extensions.dash-to-dock")
-        if dock:
+        arc = arc_settings()
+        if dock or arc:
             g = Adw.PreferencesGroup(title="Dock")
-            positions = [("BOTTOM", "Embaixo"), ("LEFT", "Na esquerda"), ("RIGHT", "Na direita")]
-            pos = Adw.ComboRow(title="Posição", model=Gtk.StringList.new([p[1] for p in positions]))
-            keys = [p[0] for p in positions]
-            cur = dock.get_string("dock-position")
+            modes = [("BOTTOM", "Embaixo", "Dock flutuante na parte de baixo"),
+                     ("LEFT", "Na esquerda", "Dock fixo na lateral esquerda"),
+                     ("RIGHT", "Na direita", "Dock fixo na lateral direita")]
+            if arc:
+                modes += [("ARC-left", "Arco na esquerda", "Encoste o mouse na borda: os apps abrem em arco"),
+                          ("ARC-right", "Arco na direita", "Encoste o mouse na borda: os apps abrem em arco")]
+            keys = [m[0] for m in modes]
+            pos = Adw.ComboRow(title="Posição", model=Gtk.StringList.new([m[1] for m in modes]))
+            if arc and extension_enabled(ARC_UUID):
+                cur = "ARC-" + arc.get_string("side")
+            else:
+                cur = dock.get_string("dock-position") if dock else "BOTTOM"
             pos.set_selected(keys.index(cur) if cur in keys else 0)
-            pos.connect("notify::selected", lambda r, _p: dock.set_string("dock-position", keys[r.get_selected()]))
+            pos.set_subtitle(modes[pos.get_selected()][2])
             g.add(pos)
 
-            size = Adw.SpinRow.new_with_range(24, 72, 4)
-            size.set_title("Tamanho dos ícones")
-            dock.bind("dash-max-icon-size", size, "value", Gio.SettingsBindFlags.DEFAULT)
-            g.add(size)
+            rows_dock, rows_arc = [], []
+            if dock:
+                size = Adw.SpinRow.new_with_range(24, 72, 4)
+                size.set_title("Tamanho dos ícones")
+                dock.bind("dash-max-icon-size", size, "value", Gio.SettingsBindFlags.DEFAULT)
+                hide = Adw.SwitchRow(title="Esconder quando uma janela encostar",
+                                     subtitle="Desligado: o dock fica sempre visível")
+                dock.bind("intellihide", hide, "active", Gio.SettingsBindFlags.DEFAULT)
+                trash = Adw.SwitchRow(title="Mostrar a lixeira")
+                dock.bind("show-trash", trash, "active", Gio.SettingsBindFlags.DEFAULT)
+                rows_dock = [size, hide, trash]
+            if arc:
+                asize = Adw.SpinRow.new_with_range(32, 72, 4)
+                asize.set_title("Tamanho dos ícones")
+                arc.bind("icon-size", asize, "value", Gio.SettingsBindFlags.DEFAULT)
+                running = Adw.SwitchRow(title="Mostrar também os apps abertos",
+                                        subtitle="Além dos favoritos")
+                arc.bind("show-running", running, "active", Gio.SettingsBindFlags.DEFAULT)
+                rows_arc = [asize, running]
+            for r in rows_dock + rows_arc:
+                g.add(r)
 
-            hide = Adw.SwitchRow(title="Esconder quando uma janela encostar",
-                                 subtitle="Desligado: o dock fica sempre visível")
-            dock.bind("intellihide", hide, "active", Gio.SettingsBindFlags.DEFAULT)
-            g.add(hide)
+            def sync_rows():
+                is_arc = keys[pos.get_selected()].startswith("ARC")
+                for r in rows_dock:
+                    r.set_visible(not is_arc)
+                for r in rows_arc:
+                    r.set_visible(is_arc)
 
-            trash = Adw.SwitchRow(title="Mostrar a lixeira")
-            dock.bind("show-trash", trash, "active", Gio.SettingsBindFlags.DEFAULT)
-            g.add(trash)
+            def on_mode(r, _p):
+                key = keys[r.get_selected()]
+                r.set_subtitle(modes[r.get_selected()][2])
+                if key.startswith("ARC"):
+                    arc.set_string("side", key.split("-", 1)[1])
+                    set_extension(DOCK_UUID, False)
+                    set_extension(ARC_UUID, True)
+                else:
+                    if dock:
+                        dock.set_string("dock-position", key)
+                    set_extension(ARC_UUID, False)
+                    set_extension(DOCK_UUID, True)
+                sync_rows()
+            pos.connect("notify::selected", on_mode)
+            sync_rows()
             self.add(g)
 
 
