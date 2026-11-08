@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# melon seguranca — confere a segurança do sistema e dá uma nota.
+# Só lê: não muda nada. Cada item que falhar vem com o comando para corrigir.
+set -uo pipefail
+
+RED=$'\e[38;2;255;84;104m' GRN=$'\e[38;2;125;211;160m' YEL=$'\e[38;2;242;197;107m' DIM=$'\e[2m' B=$'\e[1m' OFF=$'\e[0m'
+QUIET=0; [[ ${1:-} == --nota ]] && QUIET=1   # usado pelo melon doctor: só imprime a nota
+
+score=0 max=0
+pass() { score=$((score + $1)); max=$((max + $1)); ((QUIET)) || printf '   %s✔%s %s\n' "$GRN" "$OFF" "$2"; }
+hint() { ((QUIET)) || [[ -z ${1:-} ]] || printf '     %s→ %s%s\n' "$DIM" "$1" "$OFF"; }
+warn() { max=$((max + $1)); ((QUIET)) || printf '   %s!%s %s\n' "$YEL" "$OFF" "$2"; hint "${3:-}"; }
+fail() { max=$((max + $1)); ((QUIET)) || printf '   %s✘%s %s\n' "$RED" "$OFF" "$2"; hint "${3:-}"; }
+info() { ((QUIET)) || printf '   %s•%s %s\n' "$DIM" "$OFF" "$1"; }
+section() { ((QUIET)) || printf '\n%s%s%s\n' "$B" "$1" "$OFF"; }
+
+((QUIET)) || printf '\n%s🍉 melon seguranca%s %s(só leitura: nada é alterado)%s\n' "$RED" "$OFF" "$DIM" "$OFF"
+
+# ------------------------------------------------------------------ sistema
+section "Sistema"
+if [[ $(getenforce 2>/dev/null) == Enforcing ]]; then pass 3 "SELinux ativo (isola programas uns dos outros)"
+else fail 3 "SELinux não está no modo Enforcing" "sudo setenforce 1  (e SELINUX=enforcing em /etc/selinux/config)"; fi
+
+if systemctl is-active --quiet firewalld; then pass 3 "Firewall ligado"
+else fail 3 "Firewall desligado" "sudo systemctl enable --now firewalld"; fi
+
+case $(mokutil --sb-state 2>/dev/null) in
+  *enabled*) pass 2 "Secure Boot ligado (o boot não aceita código adulterado)" ;;
+  *) warn 2 "Secure Boot desligado" "ligue nas configurações da BIOS/UEFI do computador" ;;
+esac
+
+if lsblk -o TYPE 2>/dev/null | grep -qx crypt; then pass 3 "Disco criptografado (se o PC for roubado, seus arquivos ficam protegidos)"
+else warn 3 "Disco sem criptografia" "só dá para ligar reinstalando com a opção 'Criptografar disco'"; fi
+
+if systemctl is-enabled --quiet rpm-ostreed-automatic.timer 2>/dev/null; then pass 2 "Atualizações automáticas ligadas"
+else fail 2 "Atualizações automáticas desligadas" "sudo systemctl enable --now rpm-ostreed-automatic.timer"; fi
+
+ts=$(rpm-ostree status --json 2>/dev/null | jq -r '.deployments[] | select(.booted) | .timestamp' 2>/dev/null)
+if [[ -n $ts && $ts != null ]]; then
+  days=$(( ($(date +%s) - ts) / 86400 ))
+  if ((days <= 14)); then pass 2 "Sistema atualizado (versão de $days dia(s) atrás)"
+  else warn 2 "Sistema com $days dias sem atualizar" "reinicie para aplicar a atualização baixada, ou: rpm-ostree upgrade"; fi
+fi
+
+# ------------------------------------------------------------------ rede
+section "Rede"
+# protocolo/porta(programa) de quem escuta em todas as interfaces (o nome só aparece se o processo for seu)
+mapfile -t exposed < <(ss -tulnpH 2>/dev/null | awk '{print $1, $5, $7}' \
+  | grep -E '^[a-z]+ (0\.0\.0\.0|\*|\[::\]|::):' \
+  | awk '{n=split($2,a,":"); p=""; if (match($3, /"[^"]+"/)) p="(" substr($3, RSTART+1, RLENGTH-2) ")"; print $1 "/" a[n] p}' | sort -u)
+port_owner() {  # port_owner <porta tcp>: usuário dono do socket (quando o processo não é seu)
+  local uid
+  uid=$(awk -v p="$1" 'NR>1 && $4=="0A" {split($2,a,":"); if (strtonum("0x" a[2])==p) {print $8; exit}}' \
+        /proc/net/tcp /proc/net/tcp6 2>/dev/null)
+  [[ -n $uid ]] && getent passwd "$uid" | cut -d: -f1
+}
+filtered=()
+for e in "${exposed[@]}"; do
+  case ${e%%(*} in udp/5353|udp/546|udp/68|udp/67|udp/5355|tcp/5355) continue ;; esac   # mDNS, DHCP, LLMNR: normais
+  if [[ $e != *'('* && $e == tcp/* ]]; then
+    owner=$(port_owner "${e#tcp/}")
+    if [[ $owner == passim ]]; then   # cache de firmware do fwupd na rede local (padrão do Fedora, atrás do firewall)
+      info "Porta ${e#tcp/}: passim (cache de firmware do sistema, protegido pelo firewall)"
+      continue
+    fi
+    [[ -n $owner ]] && e="$e(usuário $owner)"
+  fi
+  filtered+=("$e")
+done
+if ((${#filtered[@]} == 0)); then pass 3 "Nenhuma porta aberta para a rede (só o próprio PC acessa seus servidores)"
+else
+  warn 3 "Portas aceitando conexões de outras máquinas: ${filtered[*]}" \
+    "se for servidor de desenvolvimento, rode em 127.0.0.1 (ex.: vite --host 127.0.0.1); o firewall ainda bloqueia o que não foi liberado"
+fi
+
+if systemctl is-enabled --quiet sshd 2>/dev/null; then
+  if grep -rqsE '^\s*PasswordAuthentication\s+yes' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/; then
+    fail 3 "Servidor SSH ligado aceitando senha" "use só chaves: PasswordAuthentication no em /etc/ssh/sshd_config.d/"
+  else warn 1 "Servidor SSH ligado (outras máquinas podem tentar entrar)" "se não usa: sudo systemctl disable --now sshd"; fi
+else pass 2 "Servidor SSH desligado"; fi
+
+# ------------------------------------------------------------------ sua conta
+section "Sua conta"
+if [[ $(gsettings get org.gnome.desktop.screensaver lock-enabled 2>/dev/null) == true ]]; then
+  idle=$(gsettings get org.gnome.desktop.session idle-delay 2>/dev/null | awk '{print $2}')
+  if [[ -n $idle && $idle -gt 0 && $idle -le 900 ]]; then pass 2 "Tela bloqueia sozinha ($((idle / 60)) min parado)"
+  else warn 2 "Bloqueio de tela ligado, mas a tela demora muito para apagar" "Configurações → Energia → Tela em branco: 5 min"; fi
+else fail 2 "Tela não bloqueia sozinha" "gsettings set org.gnome.desktop.screensaver lock-enabled true"; fi
+
+if [[ -d $HOME/.ssh ]]; then
+  perm=$(stat -c %a "$HOME/.ssh")
+  if [[ $perm == 700 ]]; then pass 1 "Pasta ~/.ssh protegida"
+  else fail 1 "Pasta ~/.ssh com permissão $perm" "chmod 700 ~/.ssh"; fi
+  nopass=() badperm=()
+  for k in "$HOME"/.ssh/id_*; do
+    [[ -f $k && $k != *.pub ]] || continue
+    [[ $(stat -c %a "$k") =~ ^(600|400)$ ]] || badperm+=("$(basename "$k")")
+    ssh-keygen -y -P '' -f "$k" >/dev/null 2>&1 && nopass+=("$(basename "$k")")
+  done
+  ((${#badperm[@]})) && fail 2 "Chave SSH legível por outros: ${badperm[*]}" "chmod 600 ~/.ssh/${badperm[0]}"
+  if ((${#nopass[@]})); then
+    warn 1 "Chave SSH sem senha: ${nopass[*]} (quem copiar o arquivo usa a chave)" "ssh-keygen -p -f ~/.ssh/${nopass[0]}"
+  else pass 1 "Chaves SSH protegidas por senha (ou nenhuma chave)"; fi
+fi
+
+if id -nG | grep -qw docker; then info "Você está no grupo docker: na prática, é o mesmo que acesso de administrador (normal para devs)"; fi
+
+# ------------------------------------------------------------------ apps
+section "Apps"
+broad=()
+while read -r app; do
+  [[ -n $app ]] || continue
+  fs=$(flatpak info --show-permissions "$app" 2>/dev/null | sed -n 's/^filesystems=//p')
+  [[ $fs =~ (^|;)(host|host-os|home)(;|:|$) ]] && broad+=("${app##*.}")
+done < <(flatpak list --app --columns=application 2>/dev/null)
+if ((${#broad[@]} == 0)); then pass 2 "Nenhum app Flatpak com acesso total aos seus arquivos"
+else info "Apps Flatpak com acesso à sua pasta pessoal: ${broad[*]} (normal para editores e navegadores; revise no app Flatseal)"; pass 2 "Apps Flatpak revisados"; fi
+
+autostart=()
+for f in "$HOME"/.config/autostart/*.desktop; do [[ -f $f ]] && autostart+=("$(basename "$f" .desktop)"); done
+((${#autostart[@]})) && info "Abrem sozinhos ao entrar: ${autostart[*]}"
+
+# ------------------------------------------------------------------ projetos
+section "Projetos"
+leaks=()
+while IFS= read -r g; do
+  repo=$(dirname "$g")
+  while IFS= read -r f; do
+    [[ -n $f ]] && leaks+=("${repo/#$HOME/\~}/$f")
+  done < <(git -C "$repo" ls-files 2>/dev/null | grep -E '(^|/)\.env(\.[a-z]+)?$' | grep -vE 'example|sample|template|dist')
+done < <(find "$HOME" -xdev -maxdepth 5 -type d -name .git -not -path '*/node_modules/*' -not -path '*/.*/.git' 2>/dev/null)
+if ((${#leaks[@]} == 0)); then pass 3 "Nenhum arquivo .env com segredos dentro do Git"
+else
+  fail 3 "Arquivos .env versionados no Git (segredos podem ter ido para o GitHub):"
+  ((QUIET)) || printf '     %s\n' "${leaks[@]}"
+  ((QUIET)) || printf '     %s→ guarde no cofre: melon env init  (e troque as senhas que já foram para o GitHub)%s\n' "$DIM" "$OFF"
+fi
+
+# ------------------------------------------------------------------ nota
+nota=$(( score * 100 / (max > 0 ? max : 1) ))
+if ((nota >= 85)); then cor=$GRN emoji="🛡️"; elif ((nota >= 60)); then cor=$YEL emoji="⚠️"; else cor=$RED emoji="🚨"; fi
+if ((QUIET)); then echo "$nota"; exit 0; fi
+printf '\n   %s%s Nota de segurança: %s%d/100%s\n\n' "$cor" "$emoji" "$B" "$nota" "$OFF"

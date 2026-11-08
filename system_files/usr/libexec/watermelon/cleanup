@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# melon limpar — encontra lixo e caches que podem ser apagados com segurança.
+#
+#   melon limpar          mostra o que achou (com tamanho), você escolhe, confirma e limpa
+#   melon limpar --ver    só mostra, não apaga nada
+#   melon limpar --sim    limpa tudo que é seguro sem perguntar (para scripts)
+#
+# Seguro  = cache que o próprio programa recria quando precisar (npm, pip, miniaturas...).
+# Revise  = coisas suas que provavelmente não servem mais (node_modules parados, instaladores velhos).
+# Nunca mexe em: documentos, projetos (fora node_modules que você escolher), configurações, chaves.
+set -uo pipefail
+
+RED=$'\e[38;2;255;84;104m' GRN=$'\e[38;2;125;211;160m' YEL=$'\e[38;2;242;197;107m' DIM=$'\e[2m' B=$'\e[1m' OFF=$'\e[0m'
+MODE=ask
+case "${1:-}" in
+  --ver|--dry-run|-n) MODE=dry ;;
+  --sim|--yes|-y)     MODE=yes ;;
+  -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+esac
+
+OLD_DAYS=60
+human() { numfmt --to=iec --suffix=B --format='%.1f' "${1:-0}" 2>/dev/null || echo "${1}B"; }
+size_of() {  # soma em bytes dos caminhos que existirem
+  local total=0 s p
+  for p in "$@"; do
+    [[ -e $p ]] || continue
+    s=$(du -sb "$p" 2>/dev/null | cut -f1)
+    total=$((total + ${s:-0}))
+  done
+  echo "$total"
+}
+has() { command -v "$1" >/dev/null 2>&1; }
+
+# ------------------------------------------------------------------ categorias
+# Cada uma: ID|nível(safe/review/info)|rótulo|bytes|comando de limpeza
+CATS=()
+add() { [[ ${4:-0} -gt 0 || $2 == info ]] && CATS+=("$1|$2|$3|$4|$5"); }
+
+C=$HOME/.cache
+add trash safe "Lixeira" "$(size_of "$HOME/.local/share/Trash")" "gio trash --empty"
+add thumbs safe "Miniaturas de imagens e vídeos" "$(size_of "$C/thumbnails")" \
+  "find '$C/thumbnails' -mindepth 1 -delete"
+
+# arquivos em ~/.cache sem uso há muito tempo (os programas recriam se precisarem)
+old_cache=$(find "$C" -xdev -type f -atime +$OLD_DAYS -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')
+add oldcache safe "Cache de apps sem uso há $OLD_DAYS+ dias (~/.cache)" "$old_cache" \
+  "find '$C' -xdev -type f -atime +$OLD_DAYS -delete; find '$C' -xdev -mindepth 1 -type d -empty -delete"
+
+has npm  && add npm  safe "Cache do npm"  "$(size_of "$HOME/.npm/_cacache")" "npm cache clean --force"
+has pnpm && add pnpm safe "pnpm: pacotes que nenhum projeto usa" "$(size_of "$(pnpm store path 2>/dev/null)")" "pnpm store prune"
+has bun  && add bun  safe "Cache do Bun"  "$(size_of "$HOME/.bun/install/cache")" "bun pm cache rm"
+has yarn && add yarn safe "Cache do Yarn" "$(size_of "$C/yarn" "$HOME/.yarn/berry/cache")" "yarn cache clean"
+has pip  && add pip  safe "Cache do pip"  "$(size_of "$C/pip")" "pip cache purge"
+has uv   && add uv   safe "Cache do uv"   "$(size_of "$C/uv")" "uv cache prune"
+has go   && add go   safe "Cache de build do Go" "$(size_of "$(go env GOCACHE 2>/dev/null)")" "go clean -cache"
+add cargo safe "Cache do Cargo (downloads)" "$(size_of "$HOME/.cargo/registry/cache")" \
+  "find '$HOME/.cargo/registry/cache' -mindepth 1 -delete"
+add gradle safe "Gradle: caches sem uso há $OLD_DAYS+ dias" \
+  "$(find "$HOME/.gradle/caches" -type f -atime +$OLD_DAYS -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print s+0}')" \
+  "find '$HOME/.gradle/caches' -type f -atime +$OLD_DAYS -delete"
+if has mise; then
+  n=$(mise prune --dry-run 2>&1 | grep -ciE '(remov|uninstall)[a-z]* [a-z0-9_-]+@' || true)
+  ((n > 0)) && add mise safe "Versões antigas de Node/Python/Go que nenhum projeto usa ($n)" 1 "mise prune --yes"
+fi
+
+# Flatpak: runtimes que nenhum app usa mais
+if has flatpak; then
+  unused=$(echo n | flatpak uninstall --unused --user 2>/dev/null | grep -cE '^\s*[0-9]+\.' || true)
+  ((unused > 0)) && add flatpak safe "Flatpak: $unused bibliotecas que nenhum app usa" 1 "flatpak uninstall --unused --user -y"
+fi
+
+# Containers: só se o serviço já estiver ligado (não liga o Docker só para olhar)
+if has podman; then
+  pod=$(podman system df --format '{{.Reclaimable}}' 2>/dev/null | head -1)
+  [[ -n $pod && $pod != 0B* ]] && add podman safe "Podman: imagens e containers parados ($pod)" 1 "podman system prune -f"
+fi
+if has docker && systemctl is-active --quiet docker 2>/dev/null; then
+  add docker safe "Docker: containers parados, imagens soltas e cache de build" 1 "docker system prune -f"
+fi
+
+# Logs do sistema com mais de 2 semanas (pede senha)
+jsize=$(journalctl --disk-usage 2>/dev/null | grep -oE '[0-9.]+[KMGT]' | head -1)
+[[ -n $jsize ]] && add journal review "Logs do sistema com mais de 14 dias (total hoje: ${jsize}B, pede senha)" 1 \
+  "pkexec journalctl --vacuum-time=14d"
+
+# node_modules de projetos parados
+mapfile -t NM < <(find "$HOME" -xdev -maxdepth 6 -type d -name node_modules -prune \
+  -not -path '*/.*/*' 2>/dev/null | while read -r d; do
+    p=$(dirname "$d")
+    # projeto parado: nada mudou fora do node_modules nos últimos OLD_DAYS dias
+    if [[ -z $(find "$p" -maxdepth 2 -not -path '*/node_modules*' -newermt "-$OLD_DAYS days" -print -quit 2>/dev/null) ]]; then
+      echo "$d"
+    fi
+  done)
+if ((${#NM[@]})); then
+  add nodemods review "node_modules de ${#NM[@]} projeto(s) parado(s) há $OLD_DAYS+ dias (npm install traz de volta)" \
+    "$(size_of "${NM[@]}")" "NODE_MODULES"
+fi
+
+# Instaladores velhos em Downloads
+mapfile -t INST < <(find "$HOME/Downloads" "$HOME/Transferências" -maxdepth 1 -type f -mtime +30 \
+  \( -iname '*.exe' -o -iname '*.msi' -o -iname '*.deb' -o -iname '*.rpm' -o -iname '*.appimage' -o -iname '*.iso' -o -iname '*.dmg' \) 2>/dev/null)
+((${#INST[@]})) && add installers review "${#INST[@]} instalador(es) com mais de 30 dias em Downloads" "$(size_of "${INST[@]}")" "INSTALLERS"
+
+# ------------------------------------------------------------------ relatório
+printf '\n%s🍉 melon limpar%s\n\n' "$RED" "$OFF"
+if ((${#CATS[@]} == 0)); then
+  printf '   %s✔%s Tudo limpo: não achei nada para apagar.\n\n' "$GRN" "$OFF"
+  exit 0
+fi
+
+total_safe=0
+for c in "${CATS[@]}"; do
+  IFS='|' read -r id lvl label bytes _ <<<"$c"
+  case $lvl in
+    safe)   tag="${GRN}seguro${OFF}"; total_safe=$((total_safe + (bytes > 1 ? bytes : 0))) ;;
+    review) tag="${YEL}revise${OFF}" ;;
+    *)      tag="${DIM}info${OFF}" ;;
+  esac
+  sz=""; ((bytes > 1)) && sz=$(human "$bytes")
+  printf '   %-8s %s%8s%s  %s\n' "$tag" "$B" "$sz" "$OFF" "$label"
+done
+printf '\n   %sPode liberar pelo menos %s só com o que é seguro.%s\n\n' "$DIM" "$(human $total_safe)" "$OFF"
+
+[[ $MODE == dry ]] && exit 0
+
+# ------------------------------------------------------------------ escolha
+CHOSEN=()
+if [[ $MODE == yes ]]; then
+  for c in "${CATS[@]}"; do [[ $(cut -d'|' -f2 <<<"$c") == safe ]] && CHOSEN+=("$c"); done
+else
+  labels=() preselect=()
+  for c in "${CATS[@]}"; do
+    IFS='|' read -r _ lvl label _ _ <<<"$c"
+    labels+=("$label")
+    [[ $lvl == safe ]] && preselect+=("$label")
+  done
+  sel=$(IFS=,; gum choose --no-limit --height 20 --header "O que limpar? (espaço marca/desmarca, enter confirma)" \
+        --selected="${preselect[*]}" "${labels[@]}") || exit 0
+  [[ -n $sel ]] || { echo "   Nada escolhido."; exit 0; }
+  while IFS= read -r l; do
+    for c in "${CATS[@]}"; do [[ $(cut -d'|' -f3 <<<"$c") == "$l" ]] && CHOSEN+=("$c"); done
+  done <<<"$sel"
+  gum confirm "Limpar ${#CHOSEN[@]} item(ns)?" || exit 0
+fi
+
+# ------------------------------------------------------------------ limpeza
+before=$(df --output=avail -B1 "$HOME" | tail -1)
+for c in "${CHOSEN[@]}"; do
+  IFS='|' read -r id _ label _ cmd <<<"$c"
+  case $cmd in
+    NODE_MODULES)
+      if [[ $MODE == ask ]]; then
+        pick=$(gum choose --no-limit --height 20 --header "Quais node_modules apagar?" --selected='*' "${NM[@]}") || continue
+        mapfile -t targets <<<"$pick"
+      else
+        targets=("${NM[@]}")
+      fi
+      for d in "${targets[@]}"; do [[ $d == */node_modules && -d $d ]] && rm -rf -- "$d"; done ;;
+    INSTALLERS)
+      for f in "${INST[@]}"; do gio trash -- "$f" 2>/dev/null; done ;;   # vai para a Lixeira: dá para desfazer
+    *)
+      bash -c "$cmd" >/dev/null 2>&1 ;;
+  esac && printf '   %s✔%s %s\n' "$GRN" "$OFF" "$label" || printf '   %s!%s %s (falhou)\n' "$YEL" "$OFF" "$label"
+done
+after=$(df --output=avail -B1 "$HOME" | tail -1)
+freed=$((after - before))
+((freed < 0)) && freed=0
+printf '\n   %s🎉 Liberado: %s%s\n\n' "$GRN" "$(human $freed)" "$OFF"

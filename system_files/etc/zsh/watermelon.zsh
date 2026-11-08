@@ -107,3 +107,26 @@ ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#6e6e73'
 if [[ -o login || -n $GHOSTTY_RESOURCES_DIR ]] && ! git config --global user.email >/dev/null 2>&1; then
   print -P "%F{#ff5468}🍉%f Git ainda não configurado. Rode %B%F{#7dd3a0}melon setup git%f%b para conectar ao GitHub em 1 minuto."
 fi
+
+# ------------------------------------------------------------ cofre de envs (melon env)
+# Ao entrar num projeto guardado no cofre, as variáveis dele entram no terminal (modo dev/prod);
+# ao sair, somem. Só chama o cofre quando muda de projeto ou quando o cofre é alterado.
+zmodload -F zsh/stat b:zstat 2>/dev/null
+typeset -g _MELON_VAULT_SIG=0
+_melon_vault() {
+  local bin=${MELON_VAULT_BIN:-/usr/libexec/watermelon/vault}
+  local idx=${XDG_DATA_HOME:-$HOME/.local/share}/watermelon/vault/projects
+  local stamp=${XDG_STATE_HOME:-$HOME/.local/state}/watermelon/vault/stamp
+  [[ -x $bin && -f $idx ]] || return
+  local d=$PWD root=$PWD
+  while [[ $d != / ]]; do [[ -e $d/.git ]] && { root=$d; break }; d=${d:h}; done
+  local sig=0
+  if [[ -n ${(M)${(f)"$(<$idx)"}:#$root} ]]; then
+    sig="$root:$(zstat +mtime $stamp 2>/dev/null)"
+  fi
+  [[ $sig == $_MELON_VAULT_SIG ]] && return
+  _MELON_VAULT_SIG=$sig
+  eval "$($bin hook)"
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _melon_vault

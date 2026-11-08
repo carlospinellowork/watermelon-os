@@ -7,6 +7,10 @@ _melon() {
     'setup:configura partes do sistema'
     'install:instala .exe .msi .apk .deb .rpm .AppImage'
     'personalizar:cursor, ícones, barra de cima e dock'
+    'limpar:acha lixo e caches que podem ser apagados'
+    'seguranca:confere a segurança do sistema'
+    'doctor:checa a saúde do sistema'
+    'env:cofre de variáveis dos projetos'
     'status:versão do sistema e atualizações pendentes'
     'version:versão do melon'
     'help:ajuda'
@@ -19,6 +23,17 @@ _melon() {
   elif [[ ${words[2]} == personalizar ]] && (( CURRENT == 3 )); then
     local -a pages=('cursor:cursores' 'icons:pacotes de ícones' 'bar:barra de cima e dock')
     _describe 'aba' pages
+  elif [[ ${words[2]} == limpar ]] && (( CURRENT == 3 )); then
+    local -a o=('--ver:só mostra, não apaga' '--sim:limpa o que é seguro sem perguntar'); _describe 'opção' o
+  elif [[ ${words[2]} == doctor ]] && (( CURRENT == 3 )); then
+    local -a o=('--corrigir:conserta o que der'); _describe 'opção' o
+  elif [[ ${words[2]} == env ]] && (( CURRENT == 3 )); then
+    local -a o=('init:guarda os .env do projeto no cofre' 'edit:edita as variáveis' 'use:troca entre dev e prod'
+                'set:define uma variável' 'unset:apaga uma variável' 'run:roda um comando com as variáveis'
+                'export:imprime no formato .env' 'list:projetos no cofre' 'forget:tira o projeto do cofre')
+    _describe 'ação' o
+  elif [[ ${words[2]} == env && ${words[3]} == (edit|use|export|run) ]] && (( CURRENT == 4 )); then
+    local -a o=('dev:desenvolvimento' 'prod:produção'); _describe 'modo' o
   elif [[ ${words[2]} == install ]] && (( CURRENT == 3 )); then
     _files -g '*.(exe|EXE|msi|MSI|apk|deb|rpm|AppImage|appimage|flatpakref)(-.)'
   fi

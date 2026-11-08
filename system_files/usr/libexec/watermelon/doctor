@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# melon doctor — checa a saúde do sistema e das ferramentas de desenvolvimento.
+#   melon doctor             só mostra
+#   melon doctor --corrigir  também conserta o que der para consertar sozinho
+set -uo pipefail
+
+RED=$'\e[38;2;255;84;104m' GRN=$'\e[38;2;125;211;160m' YEL=$'\e[38;2;242;197;107m' DIM=$'\e[2m' B=$'\e[1m' OFF=$'\e[0m'
+FIX=0; [[ ${1:-} == --corrigir || ${1:-} == --fix ]] && FIX=1
+LIB=/usr/libexec/watermelon
+[[ -x $LIB/security ]] || LIB=$(dirname "$(realpath "$0")")   # rodando direto do repositório
+
+problems=0
+ok()   { printf '   %s✔%s %s\n' "$GRN" "$OFF" "$1"; }
+bad()  { problems=$((problems + 1)); printf '   %s✘%s %s\n' "$RED" "$OFF" "$1"; [[ -n ${2:-} ]] && printf '     %s→ %s%s\n' "$DIM" "$2" "$OFF"; return 0; }
+meh()  { printf '   %s!%s %s\n' "$YEL" "$OFF" "$1"; [[ -n ${2:-} ]] && printf '     %s→ %s%s\n' "$DIM" "$2" "$OFF"; return 0; }
+fixed(){ printf '     %s🔧 %s%s\n' "$GRN" "$1" "$OFF"; }
+section() { printf '\n%s%s%s\n' "$B" "$1" "$OFF"; }
+has() { command -v "$1" >/dev/null 2>&1; }
+
+printf '\n%s🍉 melon doctor%s\n' "$RED" "$OFF"
+
+# ------------------------------------------------------------------ máquina
+section "Máquina"
+# a raiz (/) é a imagem do sistema, somente leitura e sempre "100%": o que importa é onde ficam seus arquivos
+read -r avail pct < <(df -B1 --output=avail,pcent "$HOME" | tail -1)
+free_h=$(numfmt --to=iec --suffix=B "$avail")
+if ((${pct%\%} >= 90)); then bad "Disco quase cheio ($pct usado, $free_h livres)" "melon limpar"
+elif ((${pct%\%} >= 80)); then meh "Disco em $pct ($free_h livres)" "melon limpar"
+else ok "Disco: $free_h livres ($pct usado)"; fi
+mem_avail=$(awk '/MemAvailable/ {print $2}' /proc/meminfo); mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+swap_used=$(awk '/SwapTotal/ {t=$2} /SwapFree/ {f=$2} END {print t-f}' /proc/meminfo)
+pct=$(( 100 - mem_avail * 100 / mem_total ))
+if ((pct >= 90)); then meh "Memória em $pct% (swap usado: $((swap_used / 1024)) MB)" "feche abas e apps pesados; veja no Monitor do sistema"
+else ok "Memória em $pct%"; fi
+if [[ -r /sys/class/power_supply/BAT0/energy_full ]]; then
+  full=$(cat /sys/class/power_supply/BAT0/energy_full); design=$(cat /sys/class/power_supply/BAT0/energy_full_design)
+  health=$(( full * 100 / design ))
+  if ((health < 70)); then meh "Saúde da bateria: $health% da capacidade original"; else ok "Saúde da bateria: $health%"; fi
+fi
+if [[ $(timedatectl show -p NTPSynchronized --value 2>/dev/null) == yes ]]; then ok "Relógio sincronizado"
+else bad "Relógio fora de sincronia (HTTPS e Git podem falhar)" "sudo systemctl restart chronyd"; fi
+
+# ------------------------------------------------------------------ sistema
+section "Sistema"
+mapfile -t failed < <(systemctl --failed --plain --no-legend 2>/dev/null | awk '{print $1}')
+mapfile -t ufailed < <(systemctl --user --failed --plain --no-legend 2>/dev/null | awk '{print $1}' \
+  | grep -v '^grub-boot-success' )   # falha esperada no bootc (/boot é somente leitura)
+if ((${#failed[@]} + ${#ufailed[@]} == 0)); then ok "Nenhum serviço com erro"
+else
+  bad "Serviços com erro: ${failed[*]} ${ufailed[*]}" "veja o motivo: journalctl -u ${failed[0]:-${ufailed[0]}} -b"
+  if ((FIX && ${#ufailed[@]})); then systemctl --user reset-failed && fixed "estado de erro dos serviços do usuário limpo"; fi
+fi
+if rpm-ostree status 2>/dev/null | grep -q 'Staged: yes\|^  staged'; then meh "Atualização baixada esperando você reiniciar"
+else ok "Sistema na versão mais recente que já foi baixada"; fi
+if has flatpak; then
+  if flatpak remotes --columns=name 2>/dev/null | grep -qx flathub; then ok "Flathub configurado"
+  else
+    bad "Loja Flathub não configurada" "flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo"
+    ((FIX)) && flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo && fixed "Flathub adicionado"
+  fi
+fi
+
+# ------------------------------------------------------------------ internet e GitHub
+section "Internet e GitHub"
+if getent hosts github.com >/dev/null; then ok "Internet e DNS funcionando"
+else bad "Sem internet ou DNS (não acho github.com)" "confira o Wi-Fi; se persistir: resolvectl flush-caches"; fi
+if has gh && gh auth status >/dev/null 2>&1; then ok "GitHub CLI logado ($(gh api user --jq .login 2>/dev/null))"
+else bad "GitHub CLI não está logado" "melon setup git"; fi
+if [[ -n $(git config --global user.email) ]]; then ok "Git com nome e e-mail configurados"
+else bad "Git sem nome/e-mail" "melon setup git"; fi
+# o GitHub responde com código 1 mesmo quando a chave é aceita: olhamos só o texto
+ssh_out=$(timeout 8 ssh -T -o BatchMode=yes -o StrictHostKeyChecking=accept-new git@github.com 2>&1 || true)
+if grep -q 'successfully authenticated' <<<"$ssh_out"; then
+  ok "Chave SSH aceita pelo GitHub"
+else meh "GitHub não aceitou sua chave SSH (push por SSH vai pedir senha ou falhar)" "melon setup git"; fi
+
+# ------------------------------------------------------------------ desenvolvimento
+section "Desenvolvimento"
+if has mise; then
+  n=$(mise ls --current 2>/dev/null | wc -l)
+  ok "mise: $n ferramenta(s) ativa(s) ($(mise ls --current 2>/dev/null | awk '{print $1 "@" $2}' | head -4 | paste -sd' '))"
+  mise doctor >/dev/null 2>&1 || meh "mise doctor encontrou algo" "rode: mise doctor"
+fi
+if has docker; then
+  if systemctl is-enabled --quiet docker.socket 2>/dev/null; then
+    if id -nG | grep -qw docker; then ok "Docker pronto (sem sudo)"
+    elif getent group docker | cut -d: -f4 | tr ',' '\n' | grep -qx "$USER"; then
+      meh "Você já está no grupo docker, mas falta sair e entrar na sessão para valer"
+    else
+      bad "Você não está no grupo docker (docker sem sudo não funciona)" "melon doctor --corrigir  (pede sua senha)"
+      ((FIX)) && pkexec "$LIB/groups-setup" && fixed "adicionado ao grupo docker: saia e entre da sessão para valer"
+    fi
+  else meh "Docker desligado" "sudo systemctl enable --now docker.socket"; fi
+fi
+if has claude || [[ -x $HOME/.local/bin/claude ]]; then ok "Claude Code instalado"
+else bad "Claude Code não instalado" "curl -fsSL https://claude.ai/install.sh | bash"; fi
+if has code || flatpak info com.visualstudio.code >/dev/null 2>&1; then ok "VS Code instalado"; fi
+
+# ------------------------------------------------------------------ segurança (resumo)
+section "Segurança"
+nota=$("$LIB/security" --nota 2>/dev/null || echo "?")
+if [[ $nota =~ ^[0-9]+$ ]] && ((nota >= 85)); then ok "Nota de segurança: $nota/100"
+else meh "Nota de segurança: $nota/100" "detalhes: melon seguranca"; fi
+
+# ------------------------------------------------------------------ resumo
+echo
+if ((problems == 0)); then printf '   %s🍉 Tudo saudável!%s\n\n' "$GRN" "$OFF"
+else
+  printf '   %s%d problema(s) encontrado(s).%s' "$YEL" "$problems" "$OFF"
+  ((FIX)) || printf ' %sAlguns se resolvem com: melon doctor --corrigir%s' "$DIM" "$OFF"
+  printf '\n\n'
+fi

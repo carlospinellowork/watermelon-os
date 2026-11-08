@@ -1,0 +1,10 @@
+[Unit]
+Description=WatermelonOS: refaz os grupos de dev quando um usuário é criado ou alterado
+
+[Path]
+# Usuário criado depois do boot (instalador, assistente, useradd) também entra no grupo docker
+PathChanged=/etc/group
+Unit=watermelon-groups.service
+
+[Install]
+WantedBy=multi-user.target

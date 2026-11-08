@@ -3,7 +3,7 @@
 
 add_newline = true
 format = """
-$directory$git_branch$git_state$git_status$nodejs$bun$deno$python$golang$rust$java$kotlin$dart$php$ruby$docker_context$kubernetes$cmd_duration
+$directory${env_var.MELON_ENV_DEV}${env_var.MELON_ENV_PROD}$git_branch$git_state$git_status$nodejs$bun$deno$python$golang$rust$java$kotlin$dart$php$ruby$docker_context$kubernetes$cmd_duration
 $character"""
 
 [directory]
@@ -81,3 +81,14 @@ format = "[󱦟 $duration]($style) "
 success_symbol = "[❯](bold #7dd3a0)"
 error_symbol = "[❯](bold #ff5468)"
 vimcmd_symbol = "[❮](bold #7dd3a0)"
+
+# Cofre de envs (melon env): mostra o modo do projeto
+[env_var.MELON_ENV_DEV]
+variable = "MELON_ENV_DEV"
+format = "[🔐 dev]($style) "
+style = "bold #7dd3a0"
+
+[env_var.MELON_ENV_PROD]
+variable = "MELON_ENV_PROD"
+format = "[🔐 PROD]($style) "
+style = "bold #ff5468"

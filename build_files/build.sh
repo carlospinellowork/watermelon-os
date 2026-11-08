@@ -67,7 +67,9 @@ systemctl enable watermelon-flatpak-update.timer
 systemctl mask flatpak-add-fedora-repos.service   # não recria a fonte "Fedora Flatpaks"
 systemctl enable docker.socket
 systemctl disable waydroid-container.service 2>/dev/null || true   # Android só liga quando usado
-systemctl enable watermelon-groups.service
+systemctl enable watermelon-groups.service watermelon-groups.path
+# grub-boot-success tenta gravar em /boot, que é somente leitura no bootc: falha a cada login
+systemctl --global mask grub-boot-success.timer grub-boot-success.service 2>/dev/null || true
 systemctl enable watermelon-flatpak-preinstall.service
 systemctl enable watermelon-boot-setup.service
 systemctl --global enable watermelon-user-setup.service

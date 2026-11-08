@@ -1,0 +1,401 @@
+#!/usr/bin/python3
+"""melon env — cofre de variáveis de ambiente dos projetos.
+
+As variáveis ficam criptografadas no chaveiro do GNOME (o mesmo das senhas do
+Wi-Fi), destravado quando você entra na sessão. Ao entrar na pasta de um projeto
+no terminal, elas são carregadas sozinhas, no modo atual (dev ou prod); ao sair, somem.
+
+  melon env                 mostra o projeto, o modo e as variáveis (valores escondidos)
+  melon env init            guarda os .env do projeto no cofre (.env, .env.local -> dev; .env.production -> prod)
+  melon env edit [dev|prod] edita as variáveis no seu editor (arquivo temporário na memória)
+  melon env set K=V [--prod]    define variáveis       melon env unset K [--prod]   apaga
+  melon env use dev|prod    troca o modo deste projeto (prod pede confirmação)
+  melon env run [dev|prod] -- comando   roda um comando com as variáveis
+  melon env export [dev|prod]           imprime no formato .env (ex.: > .env para ferramentas que exigem arquivo)
+  melon env list            projetos guardados no cofre
+  melon env forget          tira este projeto do cofre
+"""
+import json
+import os
+import shlex
+import subprocess
+import sys
+import tempfile
+
+import gi
+
+gi.require_version("Secret", "1")
+from gi.repository import Secret  # noqa: E402
+
+SCHEMA = Secret.Schema.new("os.watermelon.Vault", Secret.SchemaFlags.NONE,
+                           {"project": Secret.SchemaAttributeType.STRING,
+                            "mode": Secret.SchemaAttributeType.STRING})
+DATA = os.path.join(os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")), "watermelon", "vault")
+STATE = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "watermelon", "vault")
+INDEX = os.path.join(DATA, "projects")    # só caminhos (nada secreto): o zsh lê para saber se precisa chamar o cofre
+MODES = os.path.join(STATE, "modes.json")
+STAMP = os.path.join(STATE, "stamp")      # muda a cada alteração: o zsh recarrega quando ele muda
+MODES_OK = ("dev", "prod")
+
+RED, GRN, YEL, DIM, B, OFF = "\033[38;2;255;84;104m", "\033[38;2;125;211;160m", "\033[38;2;242;197;107m", "\033[2m", "\033[1m", "\033[0m"
+
+
+def die(msg):
+    print(f"   {RED}✘ {msg}{OFF}", file=sys.stderr)
+    sys.exit(1)
+
+
+# ------------------------------------------------------------------ projeto
+def project_root(start=None):
+    d = os.path.realpath(start or os.getcwd())
+    cur = d
+    while True:
+        if os.path.exists(os.path.join(cur, ".git")):
+            return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return d
+        cur = parent
+
+
+def read_index():
+    try:
+        with open(INDEX) as f:
+            return [ln.strip() for ln in f if ln.strip()]
+    except OSError:
+        return []
+
+
+def write_index(paths):
+    os.makedirs(DATA, exist_ok=True)
+    with open(INDEX, "w") as f:
+        f.write("\n".join(sorted(set(paths))) + ("\n" if paths else ""))
+    touch_stamp()
+
+
+def touch_stamp():
+    os.makedirs(STATE, exist_ok=True)
+    with open(STAMP, "a"):
+        os.utime(STAMP)
+
+
+def modes():
+    try:
+        with open(MODES) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def get_mode(root):
+    return modes().get(root, "dev")
+
+
+def set_mode(root, mode):
+    m = modes()
+    m[root] = mode
+    os.makedirs(STATE, exist_ok=True)
+    with open(MODES, "w") as f:
+        json.dump(m, f, indent=1)
+    touch_stamp()
+
+
+# ------------------------------------------------------------------ .env
+def parse(text):
+    env = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[7:]
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+            v = v[1:-1].replace("\\n", "\n") if v[0] == '"' else v[1:-1]
+        elif " #" in v:
+            v = v.split(" #", 1)[0].rstrip()
+        env[k] = v
+    return env
+
+
+def dump(env):
+    out = []
+    for k, v in env.items():
+        if any(c in v for c in " #\"'\n$`\\") or v == "":
+            v = '"' + v.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+        out.append(f"{k}={v}")
+    return "\n".join(out) + ("\n" if out else "")
+
+
+# ------------------------------------------------------------------ chaveiro
+def load(root, mode):
+    text = Secret.password_lookup_sync(SCHEMA, {"project": root, "mode": mode}, None)
+    return parse(text) if text else {}
+
+
+def save(root, mode, env):
+    name = os.path.basename(root)
+    Secret.password_store_sync(SCHEMA, {"project": root, "mode": mode}, Secret.COLLECTION_DEFAULT,
+                               f"Cofre melon: {name} ({mode})", dump(env), None)
+    idx = read_index()
+    if root not in idx:
+        write_index(idx + [root])
+    touch_stamp()
+
+
+def has_vault(root):
+    return root in read_index()
+
+
+def need_vault(root):
+    if not has_vault(root):
+        die(f"este projeto ainda não está no cofre ({root}). Comece com: melon env init")
+
+
+def mask(v):
+    return "•" * min(len(v), 8) if len(v) <= 4 else v[:2] + "•" * 6 + v[-2:]
+
+
+# ------------------------------------------------------------------ comandos
+def cmd_status(_args):
+    root = project_root()
+    if not has_vault(root):
+        print(f"\n   {DIM}{root}{OFF}\n   Este projeto não está no cofre. Para guardar os .env dele: {B}melon env init{OFF}\n")
+        return
+    mode = get_mode(root)
+    color = RED if mode == "prod" else GRN
+    print(f"\n   🔐 {B}{os.path.basename(root)}{OFF}  modo {color}{B}{mode}{OFF}  {DIM}{root}{OFF}\n")
+    for m in MODES_OK:
+        env = load(root, m)
+        mark = "▶" if m == mode else " "
+        print(f"   {mark} {B}{m}{OFF} {DIM}({len(env)} variáveis){OFF}")
+        for k, v in env.items():
+            print(f"       {k} {DIM}= {mask(v)}{OFF}")
+    print(f"\n   {DIM}editar: melon env edit {mode} · trocar: melon env use {'dev' if mode == 'prod' else 'prod'}{OFF}\n")
+
+
+def cmd_init(args):
+    root = project_root()
+    files = {
+        "dev": [".env", ".env.development", ".env.local", ".env.development.local"],
+        "prod": [".env", ".env.production", ".env.production.local"],
+    }
+    found = set()
+    result = {}
+    for mode, names in files.items():
+        env = load(root, mode)   # mantém o que já estava no cofre
+        for n in names:
+            p = os.path.join(root, n)
+            if os.path.isfile(p):
+                with open(p) as f:
+                    env.update(parse(f.read()))
+                found.add(n)
+        result[mode] = env
+    if not found:
+        print(f"   {YEL}!{OFF} Não achei arquivos .env em {root}. Guardando o projeto vazio: use {B}melon env edit{OFF}.")
+    for mode, env in result.items():
+        save(root, mode, env)
+        print(f"   {GRN}✔{OFF} {mode}: {len(env)} variáveis guardadas no cofre")
+    if not found:
+        return
+    print(f"   {DIM}lidos: {', '.join(sorted(found))}{OFF}")
+
+    # .gitignore
+    gi_path = os.path.join(root, ".gitignore")
+    try:
+        with open(gi_path) as f:
+            ignored = f.read()
+    except OSError:
+        ignored = ""
+    if ".env" not in ignored:
+        with open(gi_path, "a") as f:
+            f.write(("\n" if ignored and not ignored.endswith("\n") else "") + "# segredos ficam no cofre: melon env\n.env*\n!.env.example\n")
+        print(f"   {GRN}✔{OFF} .env* adicionado ao .gitignore")
+
+    # apagar os arquivos em texto puro (vão para a Lixeira)
+    if "--manter" in args or not sys.stdin.isatty():
+        return
+    ans = input(f"   Mandar os arquivos .env em texto puro para a Lixeira? Eles já estão no cofre. [S/n] ").strip().lower()
+    if ans in ("", "s", "sim", "y", "yes"):
+        for n in sorted(found):
+            subprocess.run(["gio", "trash", os.path.join(root, n)], check=False)
+        print(f"   {GRN}✔{OFF} arquivos .env na Lixeira. As variáveis carregam sozinhas quando você entra na pasta.")
+
+
+def mode_arg(args, default=None):
+    for a in args:
+        if a in MODES_OK:
+            return a
+        if a == "--prod":
+            return "prod"
+        if a == "--dev":
+            return "dev"
+    return default or get_mode(project_root())
+
+
+def editor():
+    for e in (os.environ.get("VISUAL"), os.environ.get("EDITOR"), "nvim", "nano", "vi"):
+        if e and subprocess.run(["sh", "-c", f"command -v {shlex.split(e)[0]}"], capture_output=True).returncode == 0:
+            return e
+    die("nenhum editor encontrado (defina EDITOR)")
+
+
+def cmd_edit(args):
+    root = project_root()
+    mode = mode_arg(args)
+    run_dir = os.environ.get("XDG_RUNTIME_DIR", "/tmp")   # na memória (tmpfs), só você lê
+    env = load(root, mode)
+    fd, path = tempfile.mkstemp(prefix=f"melon-env-{mode}-", suffix=".env", dir=run_dir)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(f"# {os.path.basename(root)} · modo {mode} · salve e feche para guardar no cofre\n")
+            f.write(dump(env))
+        subprocess.run(shlex.split(editor()) + [path], check=False)
+        with open(path) as f:
+            new = parse(f.read())
+        if new != env:
+            save(root, mode, new)
+            print(f"   {GRN}✔{OFF} {mode}: {len(new)} variáveis guardadas")
+        else:
+            print(f"   {DIM}nada mudou{OFF}")
+    finally:
+        size = os.path.getsize(path)
+        with open(path, "r+b") as f:   # apaga o conteúdo antes de remover o arquivo
+            f.write(b"\0" * size)
+        os.unlink(path)
+
+
+def cmd_set(args):
+    root = project_root()
+    mode = mode_arg(args, "dev")
+    pairs = [a for a in args if "=" in a and not a.startswith("--")]
+    if not pairs:
+        die("uso: melon env set CHAVE=valor [--prod]")
+    env = load(root, mode)
+    env.update(parse("\n".join(pairs)))
+    save(root, mode, env)
+    print(f"   {GRN}✔{OFF} {mode}: {', '.join(p.split('=', 1)[0] for p in pairs)}")
+
+
+def cmd_unset(args):
+    root = project_root()
+    need_vault(root)
+    mode = mode_arg(args, "dev")
+    env = load(root, mode)
+    keys = [a for a in args if not a.startswith("--") and a not in MODES_OK]
+    for k in keys:
+        env.pop(k, None)
+    save(root, mode, env)
+    print(f"   {GRN}✔{OFF} {mode}: removido {', '.join(keys)}")
+
+
+def cmd_use(args):
+    root = project_root()
+    need_vault(root)
+    if not args or args[0] not in MODES_OK:
+        die("uso: melon env use dev|prod")
+    mode = args[0]
+    if mode == "prod" and sys.stdin.isatty():
+        ans = input(f"   {RED}{B}Produção!{OFF} Comandos deste terminal vão usar as variáveis de produção. Digite 'prod' para confirmar: ")
+        if ans.strip() != "prod":
+            print("   cancelado")
+            return
+    set_mode(root, mode)
+    color = RED if mode == "prod" else GRN
+    print(f"   🔐 {os.path.basename(root)} agora em {color}{B}{mode}{OFF} (o terminal recarrega no próximo comando)")
+
+
+def cmd_run(args):
+    if "--" not in args:
+        die("uso: melon env run [dev|prod] -- comando")
+    i = args.index("--")
+    root = project_root()
+    need_vault(root)
+    env = dict(os.environ)
+    env.update(load(root, mode_arg(args[:i])))
+    os.execvpe(args[i + 1], args[i + 1:], env)
+
+
+def cmd_export(args):
+    root = project_root()
+    need_vault(root)
+    sys.stdout.write(dump(load(root, mode_arg(args))))
+
+
+def cmd_list(_args):
+    idx = read_index()
+    if not idx:
+        print("   O cofre está vazio. Entre num projeto e rode: melon env init")
+        return
+    m = modes()
+    for root in idx:
+        mode = m.get(root, "dev")
+        color = RED if mode == "prod" else GRN
+        exists = "" if os.path.isdir(root) else f" {DIM}(pasta não existe mais){OFF}"
+        print(f"   🔐 {B}{os.path.basename(root)}{OFF} {color}{mode}{OFF} {DIM}{root}{OFF}{exists}")
+
+
+def cmd_forget(_args):
+    root = project_root()
+    need_vault(root)
+    if sys.stdin.isatty():
+        ans = input(f"   Apagar do cofre TODAS as variáveis de {os.path.basename(root)} (dev e prod)? [s/N] ").strip().lower()
+        if ans not in ("s", "sim", "y", "yes"):
+            return
+    for mode in MODES_OK:
+        Secret.password_clear_sync(SCHEMA, {"project": root, "mode": mode}, None)
+    write_index([p for p in read_index() if p != root])
+    m = modes()
+    m.pop(root, None)
+    os.makedirs(STATE, exist_ok=True)
+    with open(MODES, "w") as f:
+        json.dump(m, f)
+    print(f"   {GRN}✔{OFF} {os.path.basename(root)} removido do cofre")
+
+
+def cmd_hook(args):
+    """Chamado pelo zsh: imprime os exports do projeto em que o terminal está (ou unsets ao sair)."""
+    root = project_root(args[0] if args else None)
+    out = ['for __k in ${=MELON_ENV_KEYS}; do unset $__k; done; unset __k MELON_ENV_KEYS MELON_ENV_MODE '
+           'MELON_ENV_PROJECT MELON_ENV_DEV MELON_ENV_PROD']
+    if has_vault(root):
+        mode = get_mode(root)
+        try:
+            env = load(root, mode)
+        except Exception as e:  # noqa: BLE001 — chaveiro trancado etc.: não quebra o terminal
+            print(f"print -u2 '🔐 cofre indisponível: {shlex.quote(str(e))}'")
+            return
+        for k, v in env.items():
+            if k.isidentifier():
+                out.append(f"export {k}={shlex.quote(v)}")
+        out.append(f"export MELON_ENV_KEYS={shlex.quote(' '.join(k for k in env if k.isidentifier()))}")
+        out.append(f"export MELON_ENV_MODE={mode} MELON_ENV_PROJECT={shlex.quote(os.path.basename(root))}")
+        out.append(f"export MELON_ENV_{mode.upper()}=1")
+        color = "%F{#ff5468}" if mode == "prod" else "%F{#7dd3a0}"
+        out.append(f"print -P {shlex.quote(f'%F{{242}}🔐 cofre: {os.path.basename(root)} · {color}{mode}%F{{242}} · {len(env)} variáveis carregadas%f')}")
+    print("\n".join(out))
+
+
+COMMANDS = {"init": cmd_init, "edit": cmd_edit, "set": cmd_set, "unset": cmd_unset, "use": cmd_use,
+            "run": cmd_run, "export": cmd_export, "list": cmd_list, "forget": cmd_forget, "hook": cmd_hook}
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        return cmd_status([])
+    if args[0] in ("-h", "--help", "help", "ajuda"):
+        print(__doc__)
+        return
+    fn = COMMANDS.get(args[0])
+    if not fn:
+        die(f"comando desconhecido: {args[0]} (veja: melon env ajuda)")
+    fn(args[1:])
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(130)
