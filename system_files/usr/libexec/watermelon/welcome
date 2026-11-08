@@ -105,11 +105,6 @@ def build_install_script(browser, profiles):
         'step "Preparando a loja de apps (Flathub)"',
         "flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo && ok Flathub",
     ]
-    lines += [
-        'step "Ferramentas do dia a dia"',
-        "fp com.github.finefindus.eyedropper",   # conta-gotas de cor (PowerToys)
-        "fp com.github.tenderowl.frog",          # copiar texto de imagens (OCR)
-    ]
     lines.append(f'step "Navegador: {b[1]}"')
     if b[3]:
         lines.append(f"fp {b[3]}")

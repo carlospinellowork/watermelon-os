@@ -1,0 +1,14 @@
+[Unit]
+Description=WatermelonOS: instala os apps padrão (Spotify, Flameshot...)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/watermelon/flatpak-preinstall
+Restart=on-failure
+RestartSec=5min
+TimeoutStartSec=1h
+
+[Install]
+WantedBy=multi-user.target

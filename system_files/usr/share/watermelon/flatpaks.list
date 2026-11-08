@@ -1,0 +1,6 @@
+# Apps que todo WatermelonOS já traz (instalados no primeiro boot com internet).
+# Um ID do Flathub por linha.
+com.spotify.Client
+org.flameshot.Flameshot
+com.github.finefindus.eyedropper
+com.github.tenderowl.frog

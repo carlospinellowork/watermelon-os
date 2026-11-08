@@ -3,7 +3,7 @@
 [org/gnome/shell]
 welcome-dialog-last-shown-version='999999'
 enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'blur-my-shell@aunetx', 'appindicatorsupport@rgcjonas.gmail.com', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'clipboard-indicator@tudmotu.com', 'emoji-copy@felipeftn', 'Vitals@CoreCoding.com', 'gsconnect@andyholmes.github.io', 'caffeine@patapon.info', 'ddterm@amezin.github.com', 'tiling-assistant@leleat-on-github']
-favorite-apps=['org.mozilla.firefox.desktop', 'firefox.desktop', 'com.microsoft.VSCode.desktop', 'code.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop']
+favorite-apps=['org.mozilla.firefox.desktop', 'firefox.desktop', 'com.microsoft.VSCode.desktop', 'code.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop', 'com.spotify.Client.desktop']
 
 [org/gnome/desktop/wm/preferences]
 button-layout='close,minimize,maximize:'
@@ -54,12 +54,17 @@ show-desktop=['<Super>d']
 # Super+E = arquivos (Windows) · Ctrl+Shift+Esc = gerenciador de tarefas · Ctrl+Alt+T = terminal
 [org/gnome/settings-daemon/plugins/media-keys]
 home=['<Super>e']
-custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal/']
+custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/flameshot/']
 
 [org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr]
 name='Gerenciador de tarefas'
 command='gnome-system-monitor'
 binding='<Control><Shift>Escape'
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/flameshot]
+name='Print com anotações (Flameshot)'
+command='flatpak run org.flameshot.Flameshot gui'
+binding='<Control>Print'
 
 [org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal]
 name='Terminal'
