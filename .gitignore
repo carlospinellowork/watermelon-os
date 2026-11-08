@@ -1,0 +1,8 @@
+output/
+.vm/
+*.qcow2
+*.iso
+__pycache__/
+branding/prev-*.png
+branding/preview*.png
+branding/icon-preview.png

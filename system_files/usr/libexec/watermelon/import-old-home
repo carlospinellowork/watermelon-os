@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Traz a pasta pessoal do sistema anterior (instalação sem pendrive) para o usuário atual.
+# Roda como root via pkexec:  pkexec /usr/libexec/watermelon/import-old-home <usuario-destino>
+# Os arquivos são MOVIDOS (mesmo disco = instantâneo, sem ocupar espaço extra).
+set -euo pipefail
+
+DEST_USER=${1:?usuário de destino}
+INFO=/sysroot/.watermelon-migration/info
+[ -r "$INFO" ] || { echo "nenhum sistema anterior encontrado"; exit 1; }
+# shellcheck disable=SC1090
+. "$INFO"
+SRC="/sysroot${OLD_HOME}"
+DEST_HOME=$(getent passwd "$DEST_USER" | cut -d: -f6)
+[ -d "$SRC" ] || { echo "pasta antiga não encontrada: $SRC"; exit 1; }
+[ -d "$DEST_HOME" ] || { echo "pasta do usuário não encontrada: $DEST_HOME"; exit 1; }
+
+DEST="$DEST_HOME/Sistema anterior"
+mkdir -p "$DEST"
+echo "🍉 Movendo os arquivos de $OLD_OS ($SRC) para $DEST"
+
+shopt -s dotglob nullglob
+for item in "$SRC"/*; do
+  name=$(basename "$item")
+  case "$name" in
+    .cache|.local|.config|.mozilla|.var|snap|.npm|.cargo|.rustup|.nvm) mv -- "$item" "$DEST/" ;;  # configs: só guardadas
+    .ssh|.gitconfig|.gnupg)
+      if [ -e "$DEST_HOME/$name" ]; then mv -- "$item" "$DEST/"; else mv -- "$item" "$DEST_HOME/"; fi ;;
+    *)
+      if [ -e "$DEST_HOME/$name" ]; then mv -- "$item" "$DEST/"; else mv -- "$item" "$DEST_HOME/"; fi ;;
+  esac
+done
+
+chown -R "$DEST_USER:$DEST_USER" "$DEST_HOME"
+restorecon -RF "$DEST_HOME" >/dev/null 2>&1 || true
+touch /sysroot/.watermelon-migration/imported
+echo "✔ Pronto. Configurações antigas (.config, .local...) ficaram em: $DEST"

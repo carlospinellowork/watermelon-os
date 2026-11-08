@@ -1,0 +1,9 @@
+[Unit]
+Description=WatermelonOS: atualiza apps Flatpak em segundo plano
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/flatpak update --system --noninteractive --assumeyes
+ExecStart=/usr/bin/flatpak uninstall --system --unused --noninteractive --assumeyes

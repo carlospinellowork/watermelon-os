@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bem-vindo ao WatermelonOS
+Comment=Configure navegador, perfis de desenvolvimento, GitHub e Claude
+Exec=/usr/libexec/watermelon/welcome
+Icon=watermelon-logo
+Categories=System;Settings;
+Keywords=setup;welcome;github;claude;perfil;

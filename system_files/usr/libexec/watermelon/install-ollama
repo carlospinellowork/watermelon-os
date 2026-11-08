@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Instala o Ollama na home do usuário (sem sudo) e liga como serviço do usuário.
+set -euo pipefail
+
+DEST="$HOME/.local/share/ollama"
+url=$(curl -fsSL https://api.github.com/repos/ollama/ollama/releases/latest \
+      | jq -r '.assets[] | select(.name | test("^ollama-linux-amd64\\.(tgz|tar\\.zst)$")) | .browser_download_url' | head -1)
+[ -n "$url" ] || { echo "release do Ollama não encontrado" >&2; exit 1; }
+
+rm -rf "$DEST" && mkdir -p "$DEST" "$HOME/.local/bin"
+case "$url" in
+  *.zst) curl -fsSL "$url" | tar --zstd -x -C "$DEST" ;;
+  *)     curl -fsSL "$url" | tar -xz -C "$DEST" ;;
+esac
+ln -sf "$DEST/bin/ollama" "$HOME/.local/bin/ollama"
+
+mkdir -p "$HOME/.config/systemd/user"
+cat > "$HOME/.config/systemd/user/ollama.service" <<EOF
+[Unit]
+Description=Ollama (modelos de IA locais)
+
+[Service]
+ExecStart=$DEST/bin/ollama serve
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+systemctl --user daemon-reload
+systemctl --user enable --now ollama.service

@@ -1,0 +1,430 @@
+#!/usr/bin/python3
+"""Bem-vindo ao WatermelonOS — assistente de primeiro login.
+
+Passos: boas-vindas → internet → aparência → navegador → perfis → GitHub → Claude → pronto.
+As instalações (navegador e perfis) rodam em segundo plano enquanto a pessoa
+configura o GitHub e o Claude, e o progresso aparece no último passo.
+"""
+import os
+import shlex
+import sys
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+gi.require_version("Vte", "3.91")
+gi.require_version("NM", "1.0")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, NM, Pango, Vte  # noqa: E402
+
+APP_ID = "os.watermelon.Welcome"
+SHARE = "/usr/share/watermelon"
+STATE = os.path.join(GLib.get_user_config_dir(), "watermelon")
+DONE = os.path.join(STATE, "welcome-done")
+MIGRATION = "/sysroot/.watermelon-migration"
+
+
+def old_system():
+    """Nome do sistema anterior, se o WatermelonOS foi instalado por cima dele (sem pendrive)."""
+    info = os.path.join(MIGRATION, "info")
+    if not os.path.exists(info) or os.path.exists(os.path.join(MIGRATION, "imported")):
+        return None
+    for line in open(info):
+        if line.startswith("OLD_OS="):
+            return shlex.split(line.split("=", 1)[1])[0] if line.split("=", 1)[1].strip() else "sistema anterior"
+    return "sistema anterior"
+
+BROWSERS = [
+    # id, nome, descrição, flatpak (None = já vem no sistema), arquivo .desktop
+    ("chrome", "Google Chrome", "Recomendado · busca do Google e DevTools completas", "com.google.Chrome", "com.google.Chrome.desktop"),
+    ("brave", "Brave", "Baseado no Chrome, com bloqueio de anúncios", "com.brave.Browser", "com.brave.Browser.desktop"),
+    ("opera", "Opera", "Baseado no Chrome, com VPN e barra lateral", "com.opera.Opera", "com.opera.Opera.desktop"),
+    ("firefox", "Firefox", "Já instalado · busca do Google configurada", None, "org.mozilla.firefox.desktop"),
+]
+
+PROFILES = [
+    ("fullstack", "Fullstack", "Node.js LTS, Bun, pnpm, Python, Go, extensões do VS Code, Bruno (API) e DBeaver (bancos)", True),
+    ("mobile", "Mobile", "Android Studio, Java 21, Flutter e acesso a celulares Android por USB", False),
+    ("data", "Data / IA", "Python com uv, JupyterLab e Ollama para rodar modelos de IA localmente", False),
+]
+
+CSS = """
+.wm-hero { font-size: 34px; font-weight: 800; letter-spacing: -0.5px; }
+.wm-sub { font-size: 16px; opacity: .75; }
+.wm-melon { color: #e8304a; }
+.wm-term { border-radius: 12px; padding: 10px; background: #121614; }
+.wm-card { padding: 18px; border-radius: 16px; }
+.wm-step { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #e8304a; }
+"""
+
+
+# ----------------------------------------------------------------------------- terminal embutido
+def make_terminal(height=320):
+    term = Vte.Terminal()
+    term.set_font(Pango.FontDescription.from_string("JetBrainsMono Nerd Font 10.5"))
+    term.set_size_request(-1, height)
+    term.set_vexpand(True)
+    term.set_scrollback_lines(5000)
+    term.set_cursor_blink_mode(Vte.CursorBlinkMode.ON)
+
+    def rgba(h):
+        c = Gdk.RGBA()
+        c.parse(h)
+        return c
+
+    palette = [rgba(h) for h in (
+        "#1c2320", "#ff5468", "#7dd3a0", "#f2c56b", "#6cb6ff", "#d38aea", "#5fd4d4", "#d6d3cf",
+        "#4d5a54", "#ff7a8a", "#a8e6a1", "#ffd98a", "#94caff", "#e3a9f2", "#8ae6e6", "#f5f5f7")]
+    term.set_colors(rgba("#e8e6e3"), rgba("#121614"), palette)
+    frame = Gtk.Frame(child=term)
+    frame.add_css_class("wm-term")
+    return term, frame
+
+
+def spawn(term, script, on_exit=None):
+    """Roda um script bash dentro do terminal embutido."""
+    if on_exit:
+        term.connect("child-exited", lambda _t, status: on_exit(status))
+    term.spawn_async(
+        Vte.PtyFlags.DEFAULT, os.path.expanduser("~"),
+        ["/bin/bash", "-lc", script], None, GLib.SpawnFlags.DEFAULT,
+        None, None, -1, None, None,
+    )
+
+
+# ----------------------------------------------------------------------------- script de instalação
+def build_install_script(browser, profiles):
+    b = next(x for x in BROWSERS if x[0] == browser)
+    lines = [
+        "set -u",
+        'step(){ printf "\\n\\e[38;2;255;84;104m🍉 %s\\e[0m\\n" "$*"; }',
+        'ok(){ printf "   \\e[38;2;125;211;160m✔\\e[0m %s\\n" "$*"; }',
+        'fail(){ printf "   \\e[38;2;242;197;107m!\\e[0m %s (você pode tentar de novo depois)\\n" "$*"; }',
+        'fp(){ flatpak install --user -y --noninteractive flathub "$@" && ok "$*" || fail "$*"; }',
+        'export PATH="$HOME/.local/bin:$PATH"',
+        'step "Preparando a loja de apps (Flathub)"',
+        "flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo && ok Flathub",
+    ]
+    lines += [
+        'step "Ferramentas do dia a dia"',
+        "fp com.github.finefindus.eyedropper",   # conta-gotas de cor (PowerToys)
+        "fp com.github.tenderowl.frog",          # copiar texto de imagens (OCR)
+    ]
+    lines.append(f'step "Navegador: {b[1]}"')
+    if b[3]:
+        lines.append(f"fp {b[3]}")
+    lines.append(f"xdg-settings set default-web-browser {b[4]} && ok 'navegador padrão definido' || true")
+
+    if "fullstack" in profiles:
+        lines += [
+            'step "Perfil Fullstack"',
+            "mise use -g node@lts bun@latest pnpm@latest python@3.13 go@latest && ok 'Node, Bun, pnpm, Python e Go' || fail 'runtimes'",
+            "for ext in anthropic.claude-code dbaeumer.vscode-eslint esbenp.prettier-vscode "
+            "ms-azuretools.vscode-containers ms-vscode-remote.remote-containers editorconfig.editorconfig "
+            "eamodio.gitlens usernamehw.errorlens; do code --install-extension \"$ext\" >/dev/null 2>&1 "
+            "&& ok \"VS Code: $ext\" || fail \"VS Code: $ext\"; done",
+            "fp com.usebruno.Bruno",
+            "fp io.dbeaver.DBeaverCommunity",
+        ]
+    if "mobile" in profiles:
+        lines += [
+            'step "Perfil Mobile"',
+            "mise use -g java@temurin-21 && ok 'Java 21' || fail 'Java 21'",
+            "mise use -g flutter@latest && ok 'Flutter' || fail 'Flutter'",
+            "fp com.google.AndroidStudio",
+        ]
+    if "data" in profiles:
+        lines += [
+            'step "Perfil Data / IA"',
+            "mise use -g python@3.13 uv@latest && ok 'Python e uv' || fail 'Python e uv'",
+            "uv tool install jupyterlab >/dev/null && ok 'JupyterLab (comando: jupyter lab)' || fail 'JupyterLab'",
+            "/usr/libexec/watermelon/install-ollama && ok 'Ollama (comando: ollama run llama3.2)' || fail 'Ollama'",
+        ]
+    lines += ['step "Tudo instalado!"', "touch ~/.config/watermelon/install-done"]
+    return "\n".join(lines)
+
+
+# ----------------------------------------------------------------------------- janela
+class Welcome(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Bem-vindo ao WatermelonOS")
+        self.set_default_size(880, 680)
+        self.browser = "chrome"
+        self.profiles = {p[0] for p in PROFILES if p[3]}
+        self.install_started = False
+        self.install_finished = False
+
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.SLIDE_LEFT_RIGHT,
+                               transition_duration=300, vexpand=True)
+        self.pages = []
+        self.old_os = old_system()
+        builders = [self.page_hello, self.page_network]
+        if self.old_os:
+            builders.append(self.page_import)
+        builders += [self.page_look, self.page_browser, self.page_profiles, self.page_github, self.page_claude, self.page_done]
+        for build in builders:
+            name, widget = build()
+            self.stack.add_named(widget, name)
+            self.pages.append(name)
+
+        self.back = Gtk.Button(label="Voltar")
+        self.back.connect("clicked", lambda *_: self.go(-1))
+        self.next = Gtk.Button(label="Continuar")
+        self.next.add_css_class("suggested-action")
+        self.next.add_css_class("pill")
+        self.next.connect("clicked", lambda *_: self.go(+1))
+        self.dots = Gtk.Label(css_classes=["dim-label"])
+
+        bottom = Gtk.CenterBox(margin_start=24, margin_end=24, margin_top=12, margin_bottom=18)
+        bottom.set_start_widget(self.back)
+        bottom.set_center_widget(self.dots)
+        bottom.set_end_widget(self.next)
+
+        header = Adw.HeaderBar(show_title=False)
+        view = Adw.ToolbarView()
+        view.add_top_bar(header)
+        view.set_content(self.stack)
+        view.add_bottom_bar(bottom)
+        self.set_content(view)
+        self.set_default_widget(self.next)   # Enter = Continuar
+        self.update_nav()
+        GLib.idle_add(self.next.grab_focus)
+
+    # ------------------------------------------------------------- navegação
+    def index(self):
+        return self.pages.index(self.stack.get_visible_child_name())
+
+    def go(self, delta):
+        i = self.index()
+        if self.pages[i] == "done" and delta > 0:
+            self.finish()
+            return
+        if self.pages[i] == "profiles" and delta > 0:
+            self.start_install()
+        self.stack.set_visible_child_name(self.pages[i + delta])
+        self.update_nav()
+
+    def update_nav(self):
+        i = self.index()
+        name = self.pages[i]
+        self.back.set_visible(0 < i and name != "done")
+        self.dots.set_label("  ".join("●" if j == i else "○" for j in range(len(self.pages))))
+        labels = {"hello": "Começar", "github": "Continuar", "claude": "Continuar", "done": "Começar a usar"}
+        self.next.set_label(labels.get(name, "Continuar"))
+        self.next.set_sensitive(name != "done" or self.install_finished)
+
+    # ------------------------------------------------------------- helpers de layout
+    def page(self, step, title, subtitle, *children, center=False):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14,
+                      margin_start=56, margin_end=56, margin_top=12, margin_bottom=8)
+        if center:
+            box.set_valign(Gtk.Align.CENTER)
+        if step:
+            box.append(Gtk.Label(label=step.upper(), xalign=0, css_classes=["wm-step"]))
+        box.append(Gtk.Label(label=title, xalign=0 if not center else 0.5, wrap=True, css_classes=["wm-hero"]))
+        if subtitle:
+            box.append(Gtk.Label(label=subtitle, xalign=0 if not center else 0.5, wrap=True, css_classes=["wm-sub"]))
+        for c in children:
+            box.append(c)
+        clamp = Adw.Clamp(maximum_size=780, child=box)
+        return Gtk.ScrolledWindow(child=clamp, hscrollbar_policy=Gtk.PolicyType.NEVER)
+
+    # ------------------------------------------------------------- 1. boas-vindas
+    def page_hello(self):
+        logo = Gtk.Image(icon_name="watermelon-logo", pixel_size=148, halign=Gtk.Align.CENTER)
+        title = Gtk.Label(use_markup=True, css_classes=["wm-hero"],
+                          label='Bem-vindo ao <span color="#e8304a">watermelon</span>OS')
+        sub = Gtk.Label(wrap=True, justify=Gtk.Justification.CENTER, css_classes=["wm-sub"],
+                        label="O sistema feito para quem desenvolve.\nEm poucos minutos seu computador fica pronto para programar.")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.CENTER)
+        for w in (logo, title, sub):
+            box.append(w)
+        return "hello", box
+
+    # ------------------------------------------------------------- 2. internet
+    def page_network(self):
+        self.net_status = Adw.StatusPage(icon_name="network-wireless-symbolic")
+        btn = Gtk.Button(label="Escolher rede Wi-Fi", halign=Gtk.Align.CENTER, css_classes=["pill"])
+        btn.connect("clicked", lambda *_: Gio.Subprocess.new(["gnome-control-center", "wifi"], Gio.SubprocessFlags.NONE))
+        self.net_btn = btn
+        try:
+            self.nm = NM.Client.new(None)
+        except Exception:
+            self.nm = None
+        GLib.timeout_add_seconds(2, self.refresh_network)
+        self.refresh_network()
+        page = self.page("Passo 1 de 6", "Internet", "Precisamos de internet para baixar suas ferramentas.",
+                         self.net_status, btn)
+        return "network", page
+
+    def refresh_network(self):
+        online = False
+        if self.nm:
+            online = self.nm.get_connectivity() in (NM.ConnectivityState.FULL, NM.ConnectivityState.UNKNOWN) \
+                and self.nm.get_state() == NM.State.CONNECTED_GLOBAL
+        if online:
+            self.net_status.set_icon_name("network-wireless-signal-excellent-symbolic")
+            self.net_status.set_title("Conectado")
+            self.net_status.set_description("Tudo certo, pode continuar.")
+            self.net_btn.set_visible(False)
+        else:
+            self.net_status.set_icon_name("network-wireless-offline-symbolic")
+            self.net_status.set_title("Sem conexão")
+            self.net_status.set_description("Conecte-se a uma rede Wi-Fi para continuar.")
+            self.net_btn.set_visible(True)
+        return True
+
+    # ------------------------------------------------------------- 2b. arquivos do sistema anterior
+    def page_import(self):
+        term, frame = make_terminal(220)
+        btn = Gtk.Button(label="Trazer meus arquivos", halign=Gtk.Align.START, css_classes=["pill", "suggested-action"])
+
+        def run(_b):
+            btn.set_sensitive(False)
+            spawn(term, f"pkexec /usr/libexec/watermelon/import-old-home {shlex.quote(GLib.get_user_name())}; "
+                        "echo; echo 'Pode clicar em Continuar.'")
+        btn.connect("clicked", run)
+        return "import", self.page(
+            "", "Seus arquivos",
+            f"Encontramos sua pasta pessoal do {self.old_os}. Projetos, documentos e chaves SSH vêm para cá; "
+            "configurações antigas ficam guardadas na pasta “Sistema anterior”.", btn, frame)
+
+    # ------------------------------------------------------------- 3. aparência
+    def page_look(self):
+        settings = Gio.Settings.new("org.gnome.desktop.interface")
+        row = Gtk.Box(spacing=18, homogeneous=True, margin_top=12)
+        group = None
+        for mode, label, img in (("default", "Claro", "golden-hour-day"), ("prefer-dark", "Escuro", "golden-hour-night")):
+            pic = Gtk.Picture.new_for_filename(f"/usr/share/backgrounds/watermelon/{img}.png")
+            pic.set_content_fit(Gtk.ContentFit.COVER)
+            pic.set_size_request(320, 180)
+            pic.add_css_class("card")
+            radio = Gtk.CheckButton(label=label, group=group, halign=Gtk.Align.CENTER)
+            group = group or radio
+            radio.set_active(settings.get_string("color-scheme") == mode
+                             or (mode == "default" and settings.get_string("color-scheme") != "prefer-dark"))
+            radio.connect("toggled", lambda r, m=mode: r.get_active() and settings.set_string("color-scheme", m))
+            col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            col.append(pic)
+            col.append(radio)
+            row.append(col)
+        return "look", self.page("Passo 2 de 6", "Aparência", "Claro de dia, escuro de noite. Dá para trocar quando quiser.", row)
+
+    # ------------------------------------------------------------- 4. navegador
+    def page_browser(self):
+        lst = Gtk.ListBox(css_classes=["boxed-list"], selection_mode=Gtk.SelectionMode.NONE, margin_top=8)
+        group = None
+        for bid, name, desc, _fp, _desktop in BROWSERS:
+            radio = Gtk.CheckButton(group=group, valign=Gtk.Align.CENTER)
+            group = group or radio
+            radio.set_active(bid == self.browser)
+            radio.connect("toggled", lambda r, b=bid: r.get_active() and setattr(self, "browser", b))
+            row = Adw.ActionRow(title=name, subtitle=desc, activatable_widget=radio)
+            row.add_prefix(radio)
+            lst.append(row)
+        return "browser", self.page("Passo 3 de 6", "Navegador", "Qual navegador você quer usar no dia a dia?", lst)
+
+    # ------------------------------------------------------------- 5. perfis
+    def page_profiles(self):
+        lst = Gtk.ListBox(css_classes=["boxed-list"], selection_mode=Gtk.SelectionMode.NONE, margin_top=8)
+        for pid, name, desc, default in PROFILES:
+            sw = Gtk.Switch(active=default, valign=Gtk.Align.CENTER)
+            sw.connect("notify::active", lambda s, _p, p=pid: self.profiles.add(p) if s.get_active() else self.profiles.discard(p))
+            row = Adw.ActionRow(title=name, subtitle=desc, activatable_widget=sw)
+            row.add_suffix(sw)
+            lst.append(row)
+        note = Gtk.Label(wrap=True, xalign=0, css_classes=["dim-label"],
+                         label="Docker, Git, VS Code, Claude Code e as ferramentas de terminal já vêm em todos os perfis. "
+                               "A instalação começa agora em segundo plano enquanto você segue para os próximos passos.")
+        return "profiles", self.page("Passo 4 de 6", "O que você desenvolve?", "Escolha um ou mais perfis.", lst, note)
+
+    def start_install(self):
+        if self.install_started:
+            return
+        self.install_started = True
+        os.makedirs(STATE, exist_ok=True)
+        spawn(self.install_term, build_install_script(self.browser, self.profiles), self.on_install_done)
+
+    def on_install_done(self, _status):
+        self.install_finished = True
+        self.done_status.set_title("Tudo pronto!")
+        self.done_status.set_description("Seu WatermelonOS está configurado. Bom código! 🍉")
+        self.done_spinner.set_visible(False)
+        self.update_nav()
+
+    # ------------------------------------------------------------- 6. GitHub
+    def page_github(self):
+        term, frame = make_terminal(300)
+        self.git_term = term
+        btn = Gtk.Button(label="Conectar ao GitHub", halign=Gtk.Align.START, css_classes=["pill", "suggested-action"])
+
+        def run(_b):
+            btn.set_sensitive(False)
+            spawn(term, "melon setup git; echo; echo 'Pode clicar em Continuar.'")
+        btn.connect("clicked", run)
+        return "github", self.page(
+            "Passo 5 de 6", "GitHub",
+            "Login no GitHub, chave SSH criada e enviada, commits assinados. Tudo automático: você só confirma no navegador.",
+            btn, frame)
+
+    # ------------------------------------------------------------- 7. Claude
+    def page_claude(self):
+        term, frame = make_terminal(300)
+        btn = Gtk.Button(label="Entrar no Claude", halign=Gtk.Align.START, css_classes=["pill", "suggested-action"])
+        script = (
+            'export PATH="$HOME/.local/bin:$PATH"\n'
+            "if ! command -v claude >/dev/null; then echo 'Instalando o Claude Code...'; "
+            "curl -fsSL https://claude.ai/install.sh | bash; fi\n"
+            "echo; echo 'Siga as instruções para fazer login. Depois do login, digite /exit para sair.'; echo\n"
+            "claude\n"
+            "echo; echo 'Pode clicar em Continuar.'"
+        )
+
+        def run(_b):
+            btn.set_sensitive(False)
+            spawn(term, script)
+            term.grab_focus()
+        btn.connect("clicked", run)
+        return "claude", self.page(
+            "Passo 6 de 6", "Claude Code",
+            "Seu par de programação com IA, direto no terminal. Faça login com sua conta Claude.",
+            btn, frame)
+
+    # ------------------------------------------------------------- 8. pronto
+    def page_done(self):
+        self.done_status = Adw.StatusPage(title="Instalando suas ferramentas…",
+                                          description="Pode levar alguns minutos, dependendo da internet.")
+        self.done_spinner = Adw.Spinner(halign=Gtk.Align.CENTER)
+        self.done_spinner.set_size_request(32, 32)
+        self.install_term, frame = make_terminal(260)
+        tips = Gtk.Label(wrap=True, xalign=0, css_classes=["dim-label"], use_markup=True, label=(
+            "<b>Dicas:</b> <tt>Super</tt> abre a busca · <tt>melon help</tt> mostra os comandos do sistema · "
+            "<tt>melon install arquivo.exe</tt> instala programas do Windows, apps Android, .deb e AppImage"))
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin_start=56, margin_end=56)
+        for w in (self.done_status, self.done_spinner, frame, tips):
+            box.append(w)
+        return "done", Adw.Clamp(maximum_size=780, child=box)
+
+    def finish(self):
+        os.makedirs(STATE, exist_ok=True)
+        open(DONE, "w").close()
+        self.get_application().quit()
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+
+    def do_activate(self):
+        provider = Gtk.CssProvider()
+        provider.load_from_string(CSS)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        win = self.props.active_window or Welcome(self)
+        win.present()
+
+
+if __name__ == "__main__":
+    if "--autostart" in sys.argv and os.path.exists(DONE):
+        sys.exit(0)
+    sys.exit(App().run([sys.argv[0]]))

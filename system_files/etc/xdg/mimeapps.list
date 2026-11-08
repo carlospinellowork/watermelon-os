@@ -1,0 +1,12 @@
+[Default Applications]
+application/x-ms-dos-executable=watermelon-install.desktop
+application/x-msdownload=watermelon-install.desktop
+application/vnd.microsoft.portable-executable=watermelon-install.desktop
+application/x-msi=watermelon-install.desktop
+application/x-ms-installer=watermelon-install.desktop
+application/vnd.android.package-archive=watermelon-install.desktop
+application/vnd.debian.binary-package=watermelon-install.desktop
+application/x-deb=watermelon-install.desktop
+application/x-rpm=watermelon-install.desktop
+application/x-appimage=watermelon-install.desktop
+application/vnd.appimage=watermelon-install.desktop

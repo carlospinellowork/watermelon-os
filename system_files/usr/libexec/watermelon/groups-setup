@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Em sistemas imutáveis, grupos criados por pacotes ficam em /usr/lib/group
+# e não em /etc/group, então o usermod falha. Copiamos o grupo e adicionamos
+# todo usuário administrador (wheel) ao grupo docker, para rodar docker sem sudo.
+set -euo pipefail
+
+# shellcheck disable=SC2043
+for group in docker; do
+  if ! grep -q "^${group}:" /etc/group; then
+    grep "^${group}:" /usr/lib/group >> /etc/group 2>/dev/null || groupadd --system "$group"
+  fi
+done
+
+wheel_users=$(getent group wheel | cut -d: -f4 | tr ',' ' ')
+for user in $wheel_users; do
+  id -nG "$user" | grep -qw docker || usermod -aG docker "$user"
+done
+
+# zsh como shell padrão dos administradores (só uma vez: se a pessoa trocar depois, respeitamos)
+mkdir -p /var/lib/watermelon
+for user in $wheel_users; do
+  marker="/var/lib/watermelon/shell-set-$user"
+  [ -e "$marker" ] && continue
+  if [ "$(getent passwd "$user" | cut -d: -f7)" = "/bin/bash" ] && [ -x /usr/bin/zsh ]; then
+    usermod -s /usr/bin/zsh "$user"
+  fi
+  touch "$marker"
+done
+
+# Remove a fonte de apps "Fedora Flatpaks" que o instalador pode ter adicionado (só uma vez)
+if [ ! -e /var/lib/watermelon/flatpak-cleaned ]; then
+  for remote in fedora fedora-testing; do
+    flatpak remote-delete --system --force "$remote" >/dev/null 2>&1 || true
+  done
+  touch /var/lib/watermelon/flatpak-cleaned
+fi

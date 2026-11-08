@@ -1,0 +1,4 @@
+# Variante SÓ PARA TESTES em VM: igual à imagem real + SSH ligado,
+# para inspecionar a VM de fora (make vm-ssh). Nunca vai para a ISO.
+FROM localhost/watermelon-os:latest
+RUN systemctl enable sshd && bootc container lint

@@ -1,0 +1,52 @@
+name: build
+# Constrói a imagem do WatermelonOS e publica no GitHub Container Registry.
+# Os computadores com WatermelonOS baixam daqui as atualizações automáticas.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "branding/preview*", "docs/**"]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * *"   # todo dia: pega as correções de segurança do dia
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Liberar espaço em disco (a imagem tem ~9 GB)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/watermelon-os"
+          DATE=$(date -u +%Y%m%d)
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          echo "DATE=$DATE" >> "$GITHUB_ENV"
+          sudo podman build \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.title=WatermelonOS" \
+            --label "org.opencontainers.image.description=WatermelonOS — o sistema feito para quem desenvolve" \
+            --label "org.opencontainers.image.version=1.0.$DATE" \
+            -t "$IMAGE:latest" -t "$IMAGE:$DATE" .
+
+      - name: Publicar
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          sudo podman push "$IMAGE:latest"
+          sudo podman push "$IMAGE:$DATE"

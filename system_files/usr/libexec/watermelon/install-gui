@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Duplo clique num instalador (.exe, .apk, .deb...) abre um terminal rodando o melon install.
+set -euo pipefail
+file=${1:?arquivo}
+run="melon install \"\$1\"; echo; read -rp 'Pressione Enter para fechar...'"
+if command -v ghostty >/dev/null 2>&1; then
+  exec ghostty --title="Instalando $(basename "$file")" -e bash -c "$run" _ "$file"
+else
+  exec ptyxis --new-window -x "bash -c $(printf %q "$run") _ $(printf %q "$file")"
+fi

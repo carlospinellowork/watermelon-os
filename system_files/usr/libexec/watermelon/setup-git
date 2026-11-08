@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# melon setup git — Git + GitHub + chave SSH em um comando.
+#   1. login no GitHub (navegador)        4. envia a chave para o GitHub (acesso + assinatura)
+#   2. nome e e-mail do Git               5. commits assinados, known_hosts verificado
+#   3. cria a chave SSH ed25519           6. testa a conexão
+# Pode rodar quantas vezes quiser: o que já estiver feito é reaproveitado.
+set -euo pipefail
+
+KEY="$HOME/.ssh/id_ed25519"
+SCOPES="admin:public_key,admin:ssh_signing_key,read:user,user:email"
+TITLE="WatermelonOS ($(hostname))"
+
+RED=$'\e[38;2;255;84;104m' GRN=$'\e[38;2;125;211;160m' YEL=$'\e[38;2;242;197;107m' DIM=$'\e[2m' OFF=$'\e[0m'
+step() { printf '\n%s🍉 %s%s\n' "$RED" "$*" "$OFF"; }
+ok()   { printf '   %s✔%s %s\n' "$GRN" "$OFF" "$*"; }
+info() { printf '   %s%s%s\n' "$DIM" "$*" "$OFF"; }
+warn() { printf '   %s!%s %s\n' "$YEL" "$OFF" "$*"; }
+die()  { printf '   %s✘ %s%s\n' "$RED" "$*" "$OFF" >&2; exit 1; }
+
+has_gum() { command -v gum >/dev/null 2>&1 && [ -t 0 ]; }
+ask() {  # ask "Pergunta" "padrão"
+  if has_gum; then gum input --prompt "   $1: " --value "$2" --width 70
+  else local v; read -r -p "   $1 [$2]: " v; printf '%s\n' "${v:-$2}"; fi
+}
+confirm() {  # confirm "Pergunta" (padrão: sim)
+  if has_gum; then gum confirm "$1"
+  else local v; read -r -p "   $1 [S/n] " v; [[ ! $v =~ ^[nN] ]]; fi
+}
+
+command -v gh  >/dev/null || die "GitHub CLI (gh) não encontrado"
+command -v git >/dev/null || die "git não encontrado"
+
+printf '%s\n' "${RED}watermelon${OFF}OS · configuração de Git e GitHub"
+
+# ------------------------------------------------------------------ 1. GitHub
+step "Conectando ao GitHub"
+if gh auth status -h github.com >/dev/null 2>&1; then
+  scopes=$(gh api -i user 2>/dev/null | tr -d '\r' | awk -F': ' 'tolower($1)=="x-oauth-scopes"{print $2}')
+  if [[ $scopes != *"admin:public_key"* || $scopes != *"admin:ssh_signing_key"* ]]; then
+    info "precisamos de permissão para cadastrar chaves SSH; o navegador vai abrir"
+    gh auth refresh -h github.com -s "$SCOPES"
+  fi
+else
+  info "o navegador vai abrir: confira o código mostrado aqui e autorize"
+  gh auth login -h github.com --git-protocol ssh --skip-ssh-key --web --scopes "$SCOPES"
+fi
+LOGIN=$(gh api user --jq .login)
+GH_ID=$(gh api user --jq .id)
+GH_NAME=$(gh api user --jq '.name // ""')
+ok "conectado como ${GRN}@$LOGIN${OFF}"
+
+# ------------------------------------------------------------------ 2. identidade
+step "Sua identidade nos commits"
+NOREPLY="${GH_ID}+${LOGIN}@users.noreply.github.com"
+PRIMARY=$(gh api user/emails --jq '[.[] | select(.primary)][0].email // ""' 2>/dev/null || true)
+NAME_DEFAULT=$(git config --global user.name || true)
+EMAIL_DEFAULT=$(git config --global user.email || true)
+NAME_DEFAULT=${NAME_DEFAULT:-${GH_NAME:-$LOGIN}}
+EMAIL_DEFAULT=${EMAIL_DEFAULT:-${PRIMARY:-$NOREPLY}}
+info "dica: para não expor seu e-mail em repositórios públicos, use $NOREPLY"
+NAME=$(ask "Nome" "$NAME_DEFAULT")
+EMAIL=$(ask "E-mail" "$EMAIL_DEFAULT")
+[[ -n $NAME && $EMAIL == *@* ]] || die "nome ou e-mail inválido"
+git config --global user.name "$NAME"
+git config --global user.email "$EMAIL"
+ok "$NAME <$EMAIL>"
+
+# ------------------------------------------------------------------ 3. chave SSH
+step "Chave SSH"
+mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+if [[ -f $KEY ]]; then
+  ok "usando a chave que já existe ($KEY)"
+else
+  if confirm "Proteger a chave com uma senha? (recomendado; o sistema lembra dela depois do login)"; then
+    ssh-keygen -t ed25519 -C "$EMAIL" -f "$KEY"
+  else
+    ssh-keygen -t ed25519 -C "$EMAIL" -f "$KEY" -N "" -q
+  fi
+  ok "chave ed25519 criada"
+fi
+PUB=$(cut -d' ' -f1,2 "$KEY.pub")
+
+# ------------------------------------------------------------------ 4. envia para o GitHub
+step "Enviando a chave para o GitHub"
+if gh api user/keys --paginate --jq '.[].key' | grep -qxF "$PUB"; then
+  ok "chave de acesso já estava cadastrada"
+else
+  gh ssh-key add "$KEY.pub" --title "$TITLE" --type authentication >/dev/null
+  ok "chave de acesso cadastrada (\"$TITLE\")"
+fi
+if gh api user/ssh_signing_keys --paginate --jq '.[].key' | grep -qxF "$PUB"; then
+  ok "chave de assinatura já estava cadastrada"
+else
+  gh ssh-key add "$KEY.pub" --title "$TITLE" --type signing >/dev/null
+  ok "chave de assinatura cadastrada (seus commits vão aparecer como Verified)"
+fi
+
+# ------------------------------------------------------------------ 5. known_hosts e assinatura
+step "Segurança"
+# Impressões digitais vindas da API do GitHub (via HTTPS): sem o "are you sure you want to continue connecting?"
+KH="$HOME/.ssh/known_hosts"
+touch "$KH" && chmod 600 "$KH"
+ssh-keygen -R github.com -f "$KH" >/dev/null 2>&1 || true
+gh api meta --jq '.ssh_keys[]' | sed 's/^/github.com /' >> "$KH"
+ok "servidor do GitHub verificado"
+
+ALLOWED="$HOME/.config/git/allowed_signers"
+mkdir -p "$(dirname "$ALLOWED")"
+grep -qF "$PUB" "$ALLOWED" 2>/dev/null || printf '%s namespaces="git" %s\n' "$EMAIL" "$PUB" >> "$ALLOWED"
+git config --global gpg.format ssh
+git config --global user.signingkey "$KEY.pub"
+git config --global gpg.ssh.allowedSignersFile "$ALLOWED"
+git config --global commit.gpgsign true
+git config --global tag.gpgsign true
+ok "commits e tags assinados automaticamente"
+
+gh auth setup-git >/dev/null 2>&1 && ok "clones via HTTPS também autenticados"
+
+# ------------------------------------------------------------------ 6. teste
+step "Testando a conexão"
+out=$(ssh -T -o StrictHostKeyChecking=yes git@github.com 2>&1 || true)
+if grep -q "successfully authenticated" <<<"$out"; then
+  ok "SSH funcionando"
+else
+  warn "não consegui confirmar o SSH agora:"
+  info "$out"
+  info "tente: ssh -T git@github.com"
+fi
+
+printf '\n%s🍉 Pronto!%s Experimente: %sgh repo clone %s/<repositório>%s\n\n' "$GRN" "$OFF" "$DIM" "$LOGIN" "$OFF"

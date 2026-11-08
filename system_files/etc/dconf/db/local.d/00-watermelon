@@ -1,0 +1,104 @@
+# Padrões do GNOME no WatermelonOS (o usuário pode mudar tudo depois).
+
+[org/gnome/shell]
+welcome-dialog-last-shown-version='999999'
+enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'blur-my-shell@aunetx', 'appindicatorsupport@rgcjonas.gmail.com', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'clipboard-indicator@tudmotu.com', 'emoji-copy@felipeftn', 'Vitals@CoreCoding.com', 'gsconnect@andyholmes.github.io', 'caffeine@patapon.info', 'ddterm@amezin.github.com', 'tiling-assistant@leleat-on-github']
+favorite-apps=['org.mozilla.firefox.desktop', 'firefox.desktop', 'com.microsoft.VSCode.desktop', 'code.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Software.desktop']
+
+[org/gnome/desktop/wm/preferences]
+button-layout='close,minimize,maximize:'
+
+[org/gnome/shell/extensions/dash-to-dock]
+dock-position='BOTTOM'
+extend-height=false
+dock-fixed=false
+intellihide=true
+dash-max-icon-size=48
+show-trash=false
+click-action='minimize-or-previews'
+running-indicator-style='DOTS'
+disable-overview-on-startup=true
+
+[org/gnome/desktop/interface]
+monospace-font-name='JetBrains Mono 11'
+enable-hot-corners=false
+accent-color='red'
+
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/watermelon/golden-hour-day.png'
+picture-uri-dark='file:///usr/share/backgrounds/watermelon/golden-hour-night.png'
+picture-options='zoom'
+primary-color='#241d4a'
+
+[org/gnome/desktop/screensaver]
+picture-uri='file:///usr/share/backgrounds/watermelon/golden-hour-day.png'
+picture-options='zoom'
+
+# ------------------------------------------------------------------ atalhos: o melhor de cada sistema
+# Super+Espaço = busca estilo Spotlight (apps, arquivos, calculadora)
+[org/gnome/shell/keybindings]
+toggle-overview=['<Super>space']
+toggle-message-tray=['<Super>n']
+show-screenshot-ui=['Print', '<Shift><Super>s', '<Shift><Super>4']
+
+[org/gnome/desktop/wm/keybindings]
+switch-input-source=['<Shift><Super>space']
+switch-input-source-backward=@as []
+switch-windows=['<Alt>Tab']
+switch-windows-backward=['<Shift><Alt>Tab']
+switch-applications=['<Super>Tab']
+switch-applications-backward=['<Shift><Super>Tab']
+close=['<Alt>F4', '<Super>q']
+show-desktop=['<Super>d']
+
+# Super+E = arquivos (Windows) · Ctrl+Shift+Esc = gerenciador de tarefas · Ctrl+Alt+T = terminal
+[org/gnome/settings-daemon/plugins/media-keys]
+home=['<Super>e']
+custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal/']
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr]
+name='Gerenciador de tarefas'
+command='gnome-system-monitor'
+binding='<Control><Shift>Escape'
+
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal]
+name='Terminal'
+command='ghostty'
+binding='<Control><Alt>t'
+
+# Night Shift: tela mais quente do pôr do sol ao nascer do sol
+[org/gnome/settings-daemon/plugins/color]
+night-light-enabled=true
+night-light-schedule-automatic=true
+night-light-temperature=uint32 3700
+
+# Super+V = histórico da área de transferência (Windows)
+[org/gnome/shell/extensions/clipboard-indicator]
+toggle-menu=['<Super>v']
+history-size=100
+display-mode=0
+enable-keybindings=true
+
+# Super+. = emoji (Windows)
+[org/gnome/shell/extensions/emoji-copy]
+emoji-keybind=['<Super>period']
+
+# CPU, RAM e temperatura discretos na barra
+[org/gnome/shell/extensions/vitals]
+hot-sensors=['_processor_usage_', '_memory_usage_', '_temperature_processor_0_']
+position-in-panel=2
+use-higher-precision=false
+
+# F12 = terminal suspenso (estilo Quake)
+[com/github/amezin/ddterm]
+ddterm-toggle-hotkey=['F12']
+window-size=0.45
+panel-icon-type='none'
+
+# Arquivos: Quick Look no Espaço já vem com o sushi; lista detalhada e pastas primeiro
+[org/gnome/nautilus/preferences]
+default-folder-viewer='list-view'
+show-create-link=true
+
+[org/gtk/gtk4/settings/file-chooser]
+sort-directories-first=true

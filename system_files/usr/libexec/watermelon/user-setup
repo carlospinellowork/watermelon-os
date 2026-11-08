@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Primeiro login de cada usuário.
+# O Claude Code é instalado na home do usuário (e não na imagem) porque ele
+# se atualiza sozinho, e /usr é somente leitura num sistema imutável.
+set -euo pipefail
+
+STATE="$HOME/.local/state/watermelon"
+mkdir -p "$STATE" "$HOME/.local/bin"
+log() { echo "[watermelon] $*"; }
+
+# Espera a rede (até 5 min): o primeiro login pode acontecer antes do Wi-Fi.
+for _ in $(seq 1 60); do
+  curl -fsSL --max-time 8 -o /dev/null https://claude.ai/install.sh && break
+  sleep 5
+done
+
+if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; then
+  log "instalando Claude Code"
+  curl -fsSL https://claude.ai/install.sh | bash
+fi
+
+# Cache de exemplos do tldr (tealdeer)
+command -v tldr >/dev/null 2>&1 && tldr --update >/dev/null 2>&1 || true
+
+touch "$STATE/user-setup.done"
+log "pronto"

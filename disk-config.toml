@@ -1,0 +1,9 @@
+# Usado só nas imagens de teste (VM). A ISO real cria o usuário no instalador.
+[[customizations.user]]
+name = "melon"
+password = "melon"
+groups = ["wheel"]
+
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "40 GiB"

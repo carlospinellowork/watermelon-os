@@ -1,0 +1,22 @@
+#compdef melon
+# Autocomplete do melon no zsh
+
+_melon() {
+  local -a cmds
+  cmds=(
+    'setup:configura partes do sistema'
+    'install:instala .exe .msi .apk .deb .rpm .AppImage'
+    'status:versão do sistema e atualizações pendentes'
+    'version:versão do melon'
+    'help:ajuda'
+  )
+  if (( CURRENT == 2 )); then
+    _describe 'comando' cmds
+  elif [[ ${words[2]} == setup ]] && (( CURRENT == 3 )); then
+    local -a targets=('git:GitHub + chave SSH + identidade do Git')
+    _describe 'o que configurar' targets
+  elif [[ ${words[2]} == install ]] && (( CURRENT == 3 )); then
+    _files -g '*.(exe|EXE|msi|MSI|apk|deb|rpm|AppImage|appimage|flatpakref)(-.)'
+  fi
+}
+_melon "$@"

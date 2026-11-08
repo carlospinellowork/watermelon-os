@@ -1,0 +1,11 @@
+[Unit]
+Description=WatermelonOS: preparação do usuário no primeiro login (Claude Code, runtimes)
+ConditionPathExists=!%h/.local/state/watermelon/user-setup.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/watermelon/user-setup
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=default.target

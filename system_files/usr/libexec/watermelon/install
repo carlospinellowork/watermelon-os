@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# melon install <arquivo> — instalador universal do WatermelonOS
+#   .exe .msi      -> Bottles (Wine), num "bottle" compartilhado
+#   .apk           -> Waydroid (Android em container)
+#   .deb           -> container Ubuntu (distrobox) + atalho no menu
+#   .rpm           -> container Fedora (distrobox) + atalho no menu
+#   .AppImage      -> ~/Applications + atalho no menu
+#   .flatpakref    -> Flatpak
+set -euo pipefail
+
+RED=$'\e[38;2;255;84;104m' GRN=$'\e[38;2;125;211;160m' YEL=$'\e[38;2;242;197;107m' DIM=$'\e[2m' OFF=$'\e[0m'
+step() { printf '\n%s🍉 %s%s\n' "$RED" "$*" "$OFF"; }
+ok()   { printf '   %s✔%s %s\n' "$GRN" "$OFF" "$*"; }
+info() { printf '   %s%s%s\n' "$DIM" "$*" "$OFF"; }
+warn() { printf '   %s!%s %s\n' "$YEL" "$OFF" "$*"; }
+die()  { printf '   %s✘ %s%s\n' "$RED" "$*" "$OFF" >&2; exit 1; }
+
+FILE=${1:-}
+[[ -n $FILE ]] || die "uso: melon install <arquivo.exe|.msi|.apk|.deb|.rpm|.AppImage|.flatpakref>"
+[[ -f $FILE ]] || die "arquivo não encontrado: $FILE"
+FILE=$(realpath "$FILE")
+NAME=$(basename "$FILE")
+
+APPS_DIR="$HOME/.local/share/applications"
+mkdir -p "$APPS_DIR"
+
+flatpak_ensure() {  # flatpak_ensure <app-id> <nome amigável>
+  if ! flatpak info "$1" >/dev/null 2>&1; then
+    info "primeira vez: instalando $2 (só acontece uma vez)"
+    flatpak install --user -y --noninteractive flathub "$1"
+  fi
+}
+
+# ------------------------------------------------------------------ Windows
+install_windows() {
+  local BOTTLE="Apps"
+  step "Programa do Windows: $NAME"
+  flatpak_ensure com.usebottles.bottles "Bottles (compatibilidade com Windows)"
+  # Dá ao Bottles acesso de leitura à pasta do instalador
+  flatpak override --user --filesystem="$(dirname "$FILE")":ro com.usebottles.bottles
+  local cli=(flatpak run --command=bottles-cli com.usebottles.bottles)
+  if ! "${cli[@]}" list bottles 2>/dev/null | grep -q "$BOTTLE"; then
+    info "criando o ambiente Windows \"$BOTTLE\" (leva um minuto na primeira vez)"
+    "${cli[@]}" new --bottle-name "$BOTTLE" --environment application
+  fi
+  info "abrindo o instalador; siga as telas dele normalmente"
+  "${cli[@]}" run -b "$BOTTLE" -e "$FILE"   # o Bottles reconhece .exe e .msi
+  ok "pronto: o programa fica no app Bottles, e você pode criar atalho no menu por lá"
+}
+
+# ------------------------------------------------------------------ Android
+install_android() {
+  step "App Android: $NAME"
+  command -v waydroid >/dev/null || die "Waydroid não está instalado nesta imagem"
+  if [[ ! -d /var/lib/waydroid/images && ! -f /var/lib/waydroid/waydroid.cfg ]]; then
+    info "primeira vez: baixando o Android (~1 GB, só acontece uma vez)"
+    pkexec waydroid init
+  fi
+  if ! waydroid status 2>/dev/null | grep -q 'Session:.*RUNNING'; then
+    info "ligando o Android"
+    pkexec systemctl start waydroid-container.service
+    (waydroid session start >/dev/null 2>&1 &)
+    for _ in $(seq 1 60); do
+      waydroid status 2>/dev/null | grep -q 'Session:.*RUNNING' && break
+      sleep 2
+    done
+  fi
+  waydroid app install "$FILE"
+  ok "instalado: o app aparece no menu de aplicativos"
+}
+
+# ------------------------------------------------------------------ distrobox (.deb / .rpm)
+install_in_box() {  # install_in_box <box> <imagem> <comando de instalação>
+  local box=$1 image=$2 cmd=$3
+  if ! distrobox list 2>/dev/null | awk -F'|' '{gsub(/ /,"",$2); print $2}' | grep -qx "$box"; then
+    info "primeira vez: criando o container \"$box\" (só acontece uma vez)"
+    distrobox create --yes --name "$box" --image "$image"
+  fi
+  distrobox enter "$box" -- bash -c "$cmd"
+}
+
+export_desktop_files() {  # export_desktop_files <box> <lista de .desktop>
+  local box=$1; shift
+  local n=0
+  for d in "$@"; do
+    distrobox enter "$box" -- distrobox-export --app "$(basename "$d" .desktop)" >/dev/null 2>&1 && n=$((n+1))
+  done
+  if ((n)); then ok "atalho criado no menu de aplicativos"; else info "é um programa de terminal: rode com 'distrobox enter $box -- <comando>'"; fi
+}
+
+install_deb() {
+  step "Pacote .deb: $NAME"
+  info "roda num container Ubuntu integrado ao sistema"
+  install_in_box ubuntu docker.io/library/ubuntu:24.04 \
+    "sudo apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y '$FILE'"
+  mapfile -t desktops < <(dpkg-deb -c "$FILE" 2>/dev/null | awk '{print $NF}' | grep '/usr/share/applications/.*\.desktop$' || true)
+  export_desktop_files ubuntu "${desktops[@]}"
+}
+
+install_rpm() {
+  step "Pacote .rpm: $NAME"
+  info "roda num container Fedora integrado ao sistema (o sistema base continua intacto)"
+  install_in_box fedora "registry.fedoraproject.org/fedora-toolbox:$(rpm -E %fedora)" "sudo dnf install -y '$FILE'"
+  mapfile -t desktops < <(rpm -qlp "$FILE" 2>/dev/null | grep '/usr/share/applications/.*\.desktop$' || true)
+  export_desktop_files fedora "${desktops[@]}"
+}
+
+# ------------------------------------------------------------------ AppImage
+install_appimage() {
+  step "AppImage: $NAME"
+  local dest="$HOME/Applications" tmp app id icon
+  mkdir -p "$dest"
+  install -m 0755 "$FILE" "$dest/$NAME"
+  app="$dest/$NAME"
+  id="appimage-$(basename "$NAME" .AppImage | tr -c 'A-Za-z0-9._-' '-')"
+  tmp=$(mktemp -d)
+  (cd "$tmp" && "$app" --appimage-extract '*.desktop' >/dev/null 2>&1 && "$app" --appimage-extract '.DirIcon' >/dev/null 2>&1) || true
+  icon="$HOME/.local/share/icons/$id.png"
+  mkdir -p "$(dirname "$icon")"
+  [[ -f $tmp/squashfs-root/.DirIcon ]] && cp -L "$tmp/squashfs-root/.DirIcon" "$icon" || icon="application-x-executable"
+  local src
+  src=$(find "$tmp/squashfs-root" -maxdepth 1 -name '*.desktop' 2>/dev/null | head -1)
+  if [[ -n $src ]]; then
+    sed -e "s|^Exec=[^ ]*|Exec=\"$app\"|" -e "s|^Icon=.*|Icon=$icon|" -e '/^TryExec=/d' "$src" > "$APPS_DIR/$id.desktop"
+  else
+    printf '[Desktop Entry]\nType=Application\nName=%s\nExec="%s"\nIcon=%s\nTerminal=false\n' \
+      "$(basename "$NAME" .AppImage)" "$app" "$icon" > "$APPS_DIR/$id.desktop"
+  fi
+  rm -rf "$tmp"
+  update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+  ok "instalado em ~/Applications com atalho no menu"
+}
+
+install_flatpakref() {
+  step "Flatpak: $NAME"
+  flatpak install --user -y --from "$FILE"
+  ok "instalado"
+}
+
+case "${NAME,,}" in
+  *.exe|*.msi)     install_windows ;;
+  *.apk)           install_android ;;
+  *.deb)           install_deb ;;
+  *.rpm)           install_rpm ;;
+  *.appimage)      install_appimage ;;
+  *.flatpakref)    install_flatpakref ;;
+  *) die "formato não suportado: $NAME" ;;
+esac

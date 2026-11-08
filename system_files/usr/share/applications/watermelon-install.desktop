@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Instalar com WatermelonOS
+Comment=Instala programas do Windows, apps Android, pacotes .deb/.rpm e AppImages
+Icon=system-software-install
+Exec=/usr/libexec/watermelon/install-gui %f
+Terminal=false
+NoDisplay=true
+MimeType=application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;application/x-ms-installer;application/vnd.android.package-archive;application/vnd.debian.binary-package;application/x-deb;application/x-rpm;application/x-appimage;application/vnd.appimage;application/vnd.flatpak.ref;

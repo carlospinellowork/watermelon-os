@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1300" height="760">
+  <rect width="650" height="380" fill="#f5f5f7"/><rect x="650" width="650" height="380" fill="#1c1c1e"/>
+  <image href="logo.svg" x="40" y="40" width="300" height="300"/>
+  <image href="icon.svg" x="360" y="100" width="180" height="180"/>
+  <image href="logo.svg" x="690" y="40" width="300" height="300"/>
+  <image href="icon.svg" x="1010" y="100" width="180" height="180"/>
+  <rect y="380" width="1300" height="190" fill="#f5f5f7"/><rect y="570" width="1300" height="190" fill="#1c1c1e"/>
+  <image href="wordmark-light.svg" x="40" y="400" width="620" height="150"/>
+  <image href="wordmark-dark.svg" x="40" y="590" width="620" height="150"/>
+  <image href="icon.svg" x="720" y="420" width="64" height="64"/><image href="icon.svg" x="800" y="436" width="32" height="32"/><image href="icon.svg" x="848" y="444" width="16" height="16"/>
+</svg>

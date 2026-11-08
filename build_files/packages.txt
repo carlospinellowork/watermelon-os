@@ -1,0 +1,78 @@
+# Pacotes do sistema base (instalados via dnf no build da imagem).
+# Ferramentas por linguagem (node, python, java...) NÃO ficam aqui:
+# elas vão para a camada do usuário via mise, para manter o núcleo leve.
+
+# --- rede: Wi-Fi + firmwares dos chips mais comuns de notebook
+NetworkManager-wifi
+wpa_supplicant
+iwlwifi-mvm-firmware
+iwlwifi-dvm-firmware
+realtek-firmware
+mt7xxx-firmware
+atheros-firmware
+brcmfmac-firmware
+
+# --- terminal e shell
+ghostty
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+atuin
+git-delta
+tealdeer
+lazygit
+yazi
+gum
+mkcert
+fastfetch
+unzip
+fish
+tmux
+git
+git-lfs
+gh
+fzf
+ripgrep
+fd-find
+bat
+eza
+zoxide
+btop
+jq
+yq
+just
+neovim
+direnv
+wl-clipboard
+openssl
+
+# --- containers
+moby-engine
+docker-compose
+docker-buildx
+podman-compose
+distrobox
+
+# --- compiladores (necessários para runtimes e libs nativas)
+gcc
+gcc-c++
+make
+
+# --- editor
+code
+
+# --- instalador universal (melon install)
+waydroid
+dpkg
+fuse
+fuse-libs
+
+# --- desktop (visual estilo Mac é configurado na fase 2)
+gnome-tweaks
+gnome-shell-extension-dash-to-dock
+gnome-shell-extension-blur-my-shell
+gnome-shell-extension-appindicator
+gnome-shell-extension-user-theme
+
+# --- fontes
+jetbrains-mono-fonts-all

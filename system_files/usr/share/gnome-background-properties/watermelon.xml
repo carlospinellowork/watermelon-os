@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
+<wallpapers>
+  <wallpaper deleted="false">
+    <name>WatermelonOS Golden Hour</name>
+    <filename>/usr/share/backgrounds/watermelon/golden-hour-day.png</filename>
+    <filename-dark>/usr/share/backgrounds/watermelon/golden-hour-night.png</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#241d4a</pcolor>
+    <scolor>#0d1511</scolor>
+  </wallpaper>
+</wallpapers>

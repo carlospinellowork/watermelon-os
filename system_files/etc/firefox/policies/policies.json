@@ -1,0 +1,14 @@
+{
+  "policies": {
+    "SearchEngines": { "Default": "Google" },
+    "Homepage": { "URL": "https://www.google.com", "StartPage": "homepage", "Locked": false },
+    "NoDefaultBookmarks": true,
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": "",
+    "DisableTelemetry": true,
+    "DisablePocket": true,
+    "DisableFirefoxStudies": true,
+    "FirefoxHome": { "SponsoredTopSites": false, "SponsoredPocket": false, "Pocket": false, "Highlights": false },
+    "UserMessaging": { "MoreFromMozilla": false, "FeatureRecommendations": false, "SkipOnboarding": true }
+  }
+}

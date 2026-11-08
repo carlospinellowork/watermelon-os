@@ -1,0 +1,7 @@
+# Tela de login (GDM)
+[org/gnome/login-screen]
+logo='/usr/share/watermelon/wordmark-dark.png'
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+accent-color='red'

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>WatermelonOS</title>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2a22"/><stop offset="1" stop-color="#0d1511"/></linearGradient>
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg)"/>
+  <g transform="translate(38 38) scale(0.85)">
+  <defs>
+    <!-- Mordida na lateral direita: três marcas de dente, a do meio mais funda -->
+    <mask id="bite">
+      <rect width="512" height="512" fill="#fff"/>
+      <circle cx="350" cy="158" r="30" fill="#000"/>
+      <circle cx="366" cy="200" r="34" fill="#000"/>
+      <circle cx="398" cy="231" r="30" fill="#000"/>
+    </mask>
+    <linearGradient id="flesh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff5468"/>
+      <stop offset="1" stop-color="#e8304a"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(0 31)">
+  <g mask="url(#bite)">
+    <!-- casca externa -->
+    <path d="M40 362 Q256 472 472 362 L256 32 Z" fill="#1e7a3c"/>
+    <!-- casca clara -->
+    <path d="M52 344 Q256 450 460 344 L256 32 Z" fill="#a8e6a1"/>
+    <!-- polpa -->
+    <path d="M64 326 Q256 428 448 326 L256 32 Z" fill="url(#flesh)"/>
+    <!-- sementes -->
+    <g fill="#2a1a17">
+      <path d="M256 128 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
+      <path d="M222 198 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
+      <path d="M290 198 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
+      <path d="M186 268 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
+      <path d="M256 268 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
+      <path d="M326 268 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
+    </g>
+  </g>
+  </g>
+  </g>
+</svg>

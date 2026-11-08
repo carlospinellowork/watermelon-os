@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Bem-vindo ao WatermelonOS
+Exec=/usr/libexec/watermelon/welcome --autostart
+Icon=watermelon-logo
+NoDisplay=true
+X-GNOME-Autostart-Phase=Application

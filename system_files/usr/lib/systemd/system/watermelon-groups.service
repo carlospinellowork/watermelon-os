@@ -1,0 +1,11 @@
+[Unit]
+Description=WatermelonOS: garante grupos de dev (docker) para os usuários administradores
+After=local-fs.target
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/watermelon/groups-setup
+
+[Install]
+WantedBy=multi-user.target
