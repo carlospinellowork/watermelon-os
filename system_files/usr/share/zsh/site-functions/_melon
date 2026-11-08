@@ -6,6 +6,7 @@ _melon() {
   cmds=(
     'setup:configura partes do sistema'
     'install:instala .exe .msi .apk .deb .rpm .AppImage'
+    'personalizar:cursor, ícones, barra de cima e dock'
     'status:versão do sistema e atualizações pendentes'
     'version:versão do melon'
     'help:ajuda'
@@ -15,6 +16,9 @@ _melon() {
   elif [[ ${words[2]} == setup ]] && (( CURRENT == 3 )); then
     local -a targets=('git:GitHub + chave SSH + identidade do Git')
     _describe 'o que configurar' targets
+  elif [[ ${words[2]} == personalizar ]] && (( CURRENT == 3 )); then
+    local -a pages=('cursor:cursores' 'icons:pacotes de ícones' 'bar:barra de cima e dock')
+    _describe 'aba' pages
   elif [[ ${words[2]} == install ]] && (( CURRENT == 3 )); then
     _files -g '*.(exe|EXE|msi|MSI|apk|deb|rpm|AppImage|appimage|flatpakref)(-.)'
   fi

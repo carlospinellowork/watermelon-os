@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Personalizar
+Comment=Cursor, ícones, barra de cima e dock do WatermelonOS
+Exec=/usr/libexec/watermelon/customize
+Icon=preferences-desktop-appearance
+Categories=System;Settings;DesktopSettings;
+Keywords=cursor;mouse;icones;icons;tema;theme;dock;barra;aparencia;
+StartupNotify=true

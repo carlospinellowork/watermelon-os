@@ -1,0 +1,521 @@
+#!/usr/bin/python3
+"""Personalizar — aparência do WatermelonOS.
+
+Abas:
+  Cursor        temas instalados (com prévia de verdade, lida dos arquivos Xcursor),
+                tamanho e um catálogo para baixar mais (macOS, Bibata, Phinger...).
+  Ícones        mesma ideia para pacotes de ícones (Papirus, WhiteSur, Tela...).
+  Barra e Dock  estilo da barra de cima e posição/tamanho do dock.
+
+Tudo que é baixado vai para ~/.local/share/icons (só do usuário, sem senha).
+"""
+import json
+import os
+import sys
+import shutil
+import struct
+import subprocess
+import tarfile
+import tempfile
+import threading
+import urllib.request
+import zipfile
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+
+APP_ID = "os.watermelon.Customize"
+USER_ICONS = os.path.join(GLib.get_user_data_dir(), "icons")
+UA = "WatermelonOS-Personalizar"
+
+# ------------------------------------------------------------------ catálogo
+# kind: cursor | icon
+# asset: nome exato do arquivo no último release do GitHub · source: usa o código-fonte do release
+# script: roda o install.sh do projeto com estes argumentos (+ -d <destino>)
+# provides: pastas de tema que o pacote cria (para saber se já está instalado)
+CATALOG = [
+    # cursores
+    dict(kind="cursor", title="macOS", desc="O cursor do Mac, preto com borda branca",
+         repo="ful1e5/apple_cursor", asset="macOS.tar.xz", provides=["macOS"]),
+    dict(kind="cursor", title="macOS Branco", desc="O cursor do Mac, versão clara",
+         repo="ful1e5/apple_cursor", asset="macOS-White.tar.xz", provides=["macOS-White"]),
+    dict(kind="cursor", title="Bibata Modern Classic", desc="Moderno e arredondado, preto",
+         repo="ful1e5/Bibata_Cursor", asset="Bibata-Modern-Classic.tar.xz", provides=["Bibata-Modern-Classic"]),
+    dict(kind="cursor", title="Bibata Modern Ice", desc="Moderno e arredondado, branco",
+         repo="ful1e5/Bibata_Cursor", asset="Bibata-Modern-Ice.tar.xz", provides=["Bibata-Modern-Ice"]),
+    dict(kind="cursor", title="Bibata Modern Amber", desc="Moderno e arredondado, âmbar",
+         repo="ful1e5/Bibata_Cursor", asset="Bibata-Modern-Amber.tar.xz", provides=["Bibata-Modern-Amber"]),
+    dict(kind="cursor", title="Phinger", desc="Minimalista, com animações suaves (claro e escuro)",
+         repo="phisch/phinger-cursors", asset="phinger-cursors-variants.tar.bz2",
+         provides=["phinger-cursors-dark", "phinger-cursors-light"]),
+    dict(kind="cursor", title="Google Dot Preto", desc="Inspirado no Material Design do Google",
+         repo="ful1e5/Google_Cursor", asset="GoogleDot-Black.tar.gz", provides=["GoogleDot-Black"]),
+    dict(kind="cursor", title="Google Dot Branco", desc="Inspirado no Material Design do Google",
+         repo="ful1e5/Google_Cursor", asset="GoogleDot-White.tar.gz", provides=["GoogleDot-White"]),
+    dict(kind="cursor", title="Fuchsia", desc="Estilo do Fuchsia OS, do Google",
+         repo="ful1e5/fuchsia-cursor", asset="Fuchsia.tar.xz", provides=["Fuchsia"]),
+    dict(kind="cursor", title="Fuchsia Pop", desc="Fuchsia com cores vivas",
+         repo="ful1e5/fuchsia-cursor", asset="Fuchsia-Pop.tar.xz", provides=["Fuchsia-Pop"]),
+    dict(kind="cursor", title="Catppuccin Mocha", desc="Tons pastel escuros, populares entre devs",
+         repo="catppuccin/cursors", asset="catppuccin-mocha-dark-cursors.zip",
+         provides=["catppuccin-mocha-dark-cursors"]),
+    dict(kind="cursor", title="Banana", desc="Sim, um cursor de banana 🍌",
+         repo="ful1e5/banana-cursor", asset="Banana.tar.xz", provides=["Banana"]),
+    # ícones
+    dict(kind="icon", title="WhiteSur", desc="Ícones no estilo do macOS",
+         repo="vinceliuice/WhiteSur-icon-theme", script=[],
+         provides=["WhiteSur", "WhiteSur-dark", "WhiteSur-light"]),
+    dict(kind="icon", title="Papirus", desc="Coloridos e completos: têm ícone para quase todo app",
+         repo="PapirusDevelopmentTeam/papirus-icon-theme", source=True,
+         provides=["Papirus", "Papirus-Dark", "Papirus-Light"]),
+    dict(kind="icon", title="Tela", desc="Planos e coloridos, com pastas arredondadas",
+         repo="vinceliuice/Tela-icon-theme", script=[],
+         provides=["Tela", "Tela-dark", "Tela-light"]),
+    dict(kind="icon", title="Colloid", desc="Suaves e modernos",
+         repo="vinceliuice/Colloid-icon-theme", script=[],
+         provides=["Colloid", "Colloid-Dark", "Colloid-Light"]),
+    dict(kind="icon", title="Fluent", desc="No estilo do Windows 11",
+         repo="vinceliuice/Fluent-icon-theme", script=[],
+         provides=["Fluent", "Fluent-dark", "Fluent-light"]),
+    dict(kind="icon", title="Kora", desc="Ícones com sombra e profundidade",
+         repo="bikass/kora", source=True,
+         provides=["kora", "kora-light", "kora-light-panel", "kora-pgrey"]),
+]
+
+CURSOR_PREVIEW = [("left_ptr", "default"), ("hand2", "pointer"), ("xterm", "text"), ("watch", "wait")]
+ICON_PREVIEW = ["folder", "user-home", "text-x-generic", "utilities-terminal",
+                "web-browser", "preferences-system", "user-trash"]
+HIDDEN_ICON_THEMES = {"hicolor", "locolor", "default", "AdwaitaLegacy", "Bluecurve"}
+
+CSS = """
+.wm-preview { padding: 14px; border-radius: 12px; background: alpha(@view_fg_color, .06); min-height: 56px; }
+.wm-card { padding: 12px; }
+.wm-title { font-weight: 700; }
+.wm-inuse { color: @accent_color; font-weight: 700; }
+"""
+
+
+# ------------------------------------------------------------------ temas instalados
+def icon_dirs():
+    dirs = [USER_ICONS, os.path.expanduser("~/.icons")]
+    dirs += [os.path.join(d, "icons") for d in GLib.get_system_data_dirs()]
+    seen, out = set(), []
+    for d in dirs:
+        r = os.path.realpath(d)
+        if os.path.isdir(d) and r not in seen:
+            seen.add(r)
+            out.append(d)
+    return out
+
+
+def theme_label(path, name):
+    try:
+        with open(os.path.join(path, "index.theme"), encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if line.startswith("Name="):
+                    return line.split("=", 1)[1].strip() or name
+    except OSError:
+        pass
+    return name
+
+
+def installed_themes(kind):
+    """{nome: (pasta, rótulo, é_do_usuário)} — o primeiro diretório encontrado vence (usuário antes do sistema)."""
+    found = {}
+    for base in icon_dirs():
+        user = not base.startswith("/usr")
+        for name in sorted(os.listdir(base)):
+            path = os.path.join(base, name)
+            if name in found or not os.path.isdir(path):
+                continue
+            if kind == "cursor":
+                if os.path.isdir(os.path.join(path, "cursors")):
+                    found[name] = (path, theme_label(path, name), user)
+            else:
+                idx = os.path.join(path, "index.theme")
+                if name in HIDDEN_ICON_THEMES or not os.path.exists(idx):
+                    continue
+                with open(idx, encoding="utf-8", errors="ignore") as f:
+                    if "Directories=" in f.read():
+                        found[name] = (path, theme_label(path, name), user)
+    return found
+
+
+def load_xcursor(path, size=40):
+    """Lê um arquivo Xcursor e devolve a imagem mais próxima do tamanho pedido como Gdk.Texture."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError:
+        return None
+    if data[:4] != b"Xcur":
+        return None
+    _, _, ntoc = struct.unpack_from("<III", data, 4)
+    images = []
+    for i in range(ntoc):
+        typ, sub, pos = struct.unpack_from("<III", data, 16 + i * 12)
+        if typ == 0xFFFD0002:
+            images.append((sub, pos))
+    if not images:
+        return None
+    _, pos = min(images, key=lambda e: (abs(e[0] - size), -e[0]))
+    w, h = struct.unpack_from("<II", data, pos + 16)
+    pixels = data[pos + 36: pos + 36 + w * h * 4]
+    return Gdk.MemoryTexture.new(w, h, Gdk.MemoryFormat.B8G8R8A8_PREMULTIPLIED, GLib.Bytes.new(pixels), w * 4)
+
+
+# ------------------------------------------------------------------ download e instalação
+def http_json(url):
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/vnd.github+json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def download(url, dest):
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=120) as r, open(dest, "wb") as f:
+        shutil.copyfileobj(r, f)
+
+
+def extract(archive, into):
+    if zipfile.is_zipfile(archive):
+        with zipfile.ZipFile(archive) as z:
+            for m in z.namelist():
+                target = os.path.realpath(os.path.join(into, m))
+                if not target.startswith(os.path.realpath(into) + os.sep):
+                    raise RuntimeError("arquivo com caminho inválido")
+            z.extractall(into)
+    else:
+        with tarfile.open(archive) as t:
+            t.extractall(into, filter="data")
+
+
+def find_themes(root, kind):
+    out = []
+    for path, dirs, files in os.walk(root):
+        if "index.theme" in files or (kind == "cursor" and "cursors" in dirs):
+            is_cursor = os.path.isdir(os.path.join(path, "cursors"))
+            if (kind == "cursor") == is_cursor:
+                out.append(path)
+            dirs[:] = []
+    return out
+
+
+def install_from_dir(root, kind, only=None):
+    os.makedirs(USER_ICONS, exist_ok=True)
+    names = []
+    for src in find_themes(root, kind):
+        name = os.path.basename(src.rstrip("/"))
+        if only and name not in only:
+            continue
+        dest = os.path.join(USER_ICONS, name)
+        if os.path.islink(dest) or os.path.isfile(dest):
+            os.unlink(dest)
+        elif os.path.isdir(dest):
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest, symlinks=True)
+        names.append(name)
+    if not names:
+        raise RuntimeError("nenhum tema encontrado no arquivo")
+    return names
+
+
+def install_entry(entry):
+    with tempfile.TemporaryDirectory(prefix="wm-theme-") as tmp:
+        rel = http_json(f"https://api.github.com/repos/{entry['repo']}/releases/latest")
+        if "asset" in entry:
+            url = next((a["browser_download_url"] for a in rel.get("assets", [])
+                        if a["name"] == entry["asset"]), None)
+            if not url:
+                raise RuntimeError(f"{entry['asset']} não está no último release")
+            archive = os.path.join(tmp, entry["asset"])
+        else:
+            url = rel["tarball_url"]
+            archive = os.path.join(tmp, "source.tar.gz")
+        download(url, archive)
+        src = os.path.join(tmp, "src")
+        os.makedirs(src)
+        extract(archive, src)
+        if "script" in entry:
+            top = next((os.path.join(src, d) for d in os.listdir(src)), src)
+            os.makedirs(USER_ICONS, exist_ok=True)
+            subprocess.run(["bash", "install.sh", "-d", USER_ICONS, *entry["script"]], cwd=top,
+                           check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            return entry["provides"]
+        return install_from_dir(src, entry["kind"], only=entry["provides"])
+
+
+# ------------------------------------------------------------------ interface
+class ThemePage(Gtk.ScrolledWindow):
+    """Página com os temas instalados e o catálogo para baixar."""
+
+    def __init__(self, win, kind):
+        super().__init__(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        self.win, self.kind = win, kind
+        self.key = "cursor-theme" if kind == "cursor" else "icon-theme"
+        self.iface = Gio.Settings.new("org.gnome.desktop.interface")
+        self.iface.connect(f"changed::{self.key}", lambda *_: self.refresh())
+        self.busy = set()
+
+        clamp = Adw.Clamp(maximum_size=960, margin_top=18, margin_bottom=24, margin_start=18, margin_end=18)
+        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        clamp.set_child(self.box)
+        self.set_child(clamp)
+
+        if kind == "cursor":
+            size_row = Gtk.Box(spacing=12)
+            size_row.append(Gtk.Label(label="Tamanho", css_classes=["heading"], hexpand=True, xalign=0))
+            group = Adw.ToggleGroup()
+            for s in (24, 32, 48, 64):
+                group.add(Adw.Toggle(label=str(s), name=str(s)))
+            group.set_active_name(str(self.iface.get_int("cursor-size")))
+            group.connect("notify::active-name",
+                          lambda g, _p: self.iface.set_int("cursor-size", int(g.get_active_name())))
+            size_row.append(group)
+            self.box.append(size_row)
+
+        head = Gtk.Box(spacing=12, margin_top=6)
+        head.append(Gtk.Label(label="Instalados", css_classes=["title-4"], hexpand=True, xalign=0))
+        add = Gtk.Button(label="Instalar de um arquivo…", css_classes=["flat"])
+        add.connect("clicked", self.on_file)
+        head.append(add)
+        self.box.append(head)
+        self.installed = self.flow()
+        self.box.append(self.installed)
+
+        self.box.append(Gtk.Label(label="Para baixar", css_classes=["title-4"], xalign=0, margin_top=18))
+        self.catalog = self.flow()
+        self.box.append(self.catalog)
+        self.refresh()
+
+    def flow(self):
+        return Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+                           min_children_per_line=1, max_children_per_line=3,
+                           row_spacing=12, column_spacing=12)
+
+    # ---- prévias
+    def preview(self, path):
+        row = Gtk.Box(spacing=16, halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
+        if self.kind == "cursor":
+            for names in CURSOR_PREVIEW:
+                tex = next(filter(None, (load_xcursor(os.path.join(path, "cursors", n)) for n in names)), None)
+                if tex:
+                    pic = Gtk.Picture.new_for_paintable(tex)
+                    pic.set_size_request(32, 32)
+                    pic.set_can_shrink(True)
+                    row.append(pic)
+        else:
+            theme = Gtk.IconTheme()
+            theme.set_search_path([os.path.dirname(path)] + icon_dirs())
+            theme.set_theme_name(os.path.basename(path))
+            for n in ICON_PREVIEW:
+                p = theme.lookup_icon(n, None, 32, 1, Gtk.TextDirection.LTR, 0)
+                img = Gtk.Image.new_from_paintable(p)
+                img.set_pixel_size(32)
+                row.append(img)
+        return row
+
+    def card(self, title, subtitle, content, action):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, css_classes=["card", "wm-card"])
+        pv = Gtk.Box(css_classes=["wm-preview"], hexpand=True)
+        content.set_hexpand(True)
+        pv.append(content)
+        box.append(pv)
+        info = Gtk.Box(spacing=8)
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, hexpand=True)
+        text.append(Gtk.Label(label=title, css_classes=["wm-title"], xalign=0,
+                              ellipsize=3))
+        if subtitle:
+            text.append(Gtk.Label(label=subtitle, css_classes=["dim-label", "caption"], xalign=0,
+                                  wrap=True, max_width_chars=28))
+        info.append(text)
+        info.append(action)
+        box.append(info)
+        return box
+
+    # ---- listas
+    def refresh(self):
+        current = self.iface.get_string(self.key)
+        themes = installed_themes(self.kind)
+        self.installed.remove_all()
+        for name, (path, label, user) in sorted(themes.items(), key=lambda kv: kv[1][1].lower()):
+            if name == current:
+                act = Gtk.Label(label="✓ Em uso", css_classes=["wm-inuse"])
+            else:
+                act = Gtk.Box(spacing=4)
+                use = Gtk.Button(label="Usar", css_classes=["suggested-action", "pill"], valign=Gtk.Align.CENTER)
+                use.connect("clicked", lambda _b, n=name: self.apply(n))
+                act.append(use)
+                if user and not os.path.islink(path):
+                    rm = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remover",
+                                    css_classes=["flat", "circular"], valign=Gtk.Align.CENTER)
+                    rm.connect("clicked", lambda _b, p=path: self.remove(p))
+                    act.append(rm)
+            self.installed.append(self.card(label, None, self.preview(path), act))
+
+        self.catalog.remove_all()
+        for e in CATALOG:
+            if e["kind"] != self.kind or any(p in themes for p in e["provides"]):
+                continue
+            if e["title"] in self.busy:
+                act = Adw.Spinner(width_request=24, height_request=24)
+            else:
+                act = Gtk.Button(label="Baixar", css_classes=["pill"], valign=Gtk.Align.CENTER)
+                act.connect("clicked", lambda _b, en=e: self.fetch(en))
+            icon = Gtk.Image(icon_name="folder-download-symbolic", pixel_size=32, opacity=0.4)
+            self.catalog.append(self.card(e["title"], e["desc"], icon, act))
+
+    # ---- ações
+    def apply(self, name):
+        self.iface.set_string(self.key, name)
+        self.win.toast(f"{name} aplicado")
+
+    def remove(self, path):
+        name = os.path.basename(path)
+        if self.iface.get_string(self.key) == name:
+            self.iface.reset(self.key)
+        shutil.rmtree(path, ignore_errors=True)
+        self.refresh()
+        self.win.toast(f"{name} removido")
+
+    def fetch(self, entry):
+        self.busy.add(entry["title"])
+        self.refresh()
+
+        def work():
+            try:
+                names = install_entry(entry)
+                GLib.idle_add(self.done, entry, names, None)
+            except Exception as exc:  # noqa: BLE001 — mostra qualquer falha para a pessoa
+                GLib.idle_add(self.done, entry, None, exc)
+        threading.Thread(target=work, daemon=True).start()
+
+    def done(self, entry, names, error):
+        self.busy.discard(entry["title"])
+        self.refresh()
+        if error:
+            self.win.toast(f"Não deu para baixar {entry['title']}: {error}")
+        else:
+            self.apply(names[0])
+        return False
+
+    def on_file(self, _btn):
+        dialog = Gtk.FileDialog(title="Escolha o arquivo do tema (.tar.gz, .tar.xz, .zip)")
+
+        def picked(d, res):
+            try:
+                f = d.open_finish(res)
+            except GLib.Error:
+                return
+            try:
+                with tempfile.TemporaryDirectory(prefix="wm-theme-") as tmp:
+                    extract(f.get_path(), tmp)
+                    names = install_from_dir(tmp, self.kind)
+                self.refresh()
+                self.apply(names[0])
+            except Exception as exc:  # noqa: BLE001
+                self.win.toast(f"Não deu para instalar: {exc}")
+        dialog.open(self.win, None, picked)
+
+
+class BarPage(Adw.PreferencesPage):
+    def __init__(self, win):
+        super().__init__()
+        src = Gio.SettingsSchemaSource.get_default()
+
+        def settings(schema):
+            return Gio.Settings.new(schema) if src.lookup(schema, True) else None
+
+        # barra de cima
+        bar = Adw.PreferencesGroup(title="Barra de cima")
+        ut = settings("org.gnome.shell.extensions.user-theme")
+        if ut:
+            styles = [("Watermelon", "Ilhas de vidro", "Três ilhas arredondadas e flutuantes"),
+                      ("", "Padrão do GNOME", "Barra preta inteira")]
+            row = Adw.ComboRow(title="Estilo", model=Gtk.StringList.new([s[1] for s in styles]))
+            names = [s[0] for s in styles]
+            cur = ut.get_string("name")
+            row.set_selected(names.index(cur) if cur in names else 0)
+            row.set_subtitle(styles[row.get_selected()][2])
+
+            def on_style(r, _p):
+                ut.set_string("name", names[r.get_selected()])
+                r.set_subtitle(styles[r.get_selected()][2])
+            row.connect("notify::selected", on_style)
+            bar.add(row)
+        iface = Gio.Settings.new("org.gnome.desktop.interface")
+        for key, title in (("clock-show-date", "Mostrar a data"), ("clock-show-weekday", "Mostrar o dia da semana"),
+                           ("clock-show-seconds", "Mostrar os segundos")):
+            sw = Adw.SwitchRow(title=title)
+            iface.bind(key, sw, "active", Gio.SettingsBindFlags.DEFAULT)
+            bar.add(sw)
+        self.add(bar)
+
+        # dock
+        dock = settings("org.gnome.shell.extensions.dash-to-dock")
+        if dock:
+            g = Adw.PreferencesGroup(title="Dock")
+            positions = [("BOTTOM", "Embaixo"), ("LEFT", "Na esquerda"), ("RIGHT", "Na direita")]
+            pos = Adw.ComboRow(title="Posição", model=Gtk.StringList.new([p[1] for p in positions]))
+            keys = [p[0] for p in positions]
+            cur = dock.get_string("dock-position")
+            pos.set_selected(keys.index(cur) if cur in keys else 0)
+            pos.connect("notify::selected", lambda r, _p: dock.set_string("dock-position", keys[r.get_selected()]))
+            g.add(pos)
+
+            size = Adw.SpinRow.new_with_range(24, 72, 4)
+            size.set_title("Tamanho dos ícones")
+            dock.bind("dash-max-icon-size", size, "value", Gio.SettingsBindFlags.DEFAULT)
+            g.add(size)
+
+            hide = Adw.SwitchRow(title="Esconder quando uma janela encostar",
+                                 subtitle="Desligado: o dock fica sempre visível")
+            dock.bind("intellihide", hide, "active", Gio.SettingsBindFlags.DEFAULT)
+            g.add(hide)
+
+            trash = Adw.SwitchRow(title="Mostrar a lixeira")
+            dock.bind("show-trash", trash, "active", Gio.SettingsBindFlags.DEFAULT)
+            g.add(trash)
+            self.add(g)
+
+
+class Window(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Personalizar", default_width=980, default_height=720)
+        self.toasts = Adw.ToastOverlay()
+        stack = Adw.ViewStack()
+        stack.add_titled_with_icon(ThemePage(self, "cursor"), "cursor", "Cursor", "input-mouse-symbolic")
+        stack.add_titled_with_icon(ThemePage(self, "icon"), "icons", "Ícones", "folder-pictures-symbolic")
+        stack.add_titled_with_icon(BarPage(self), "bar", "Barra e Dock", "view-grid-symbolic")
+        if START_PAGE in ("cursor", "icons", "bar"):
+            stack.set_visible_child_name(START_PAGE)
+        header = Adw.HeaderBar(title_widget=Adw.ViewSwitcher(stack=stack, policy=Adw.ViewSwitcherPolicy.WIDE))
+        view = Adw.ToolbarView(content=stack)
+        view.add_top_bar(header)
+        self.toasts.set_child(view)
+        self.set_content(self.toasts)
+
+    def toast(self, text):
+        self.toasts.add_toast(Adw.Toast(title=GLib.markup_escape_text(text), timeout=3))
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+
+    def do_activate(self):
+        css = Gtk.CssProvider()
+        css.load_from_string(CSS)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), css,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        (self.props.active_window or Window(self)).present()
+
+
+# `customize icons` / `customize bar` abre direto na aba
+START_PAGE = sys.argv[1] if len(sys.argv) > 1 else "cursor"
+
+if __name__ == "__main__":
+    App().run([sys.argv[0]])

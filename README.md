@@ -31,6 +31,7 @@ Instale, entre no GitHub e no Claude, e em minutos seu computador está pronto p
 | 🐳 **Docker + VS Code** | Docker sem `sudo`, Dev Containers, VS Code configurado |
 | 📦 **Instala qualquer coisa** | `melon install` abre `.exe`, `.apk`, `.deb`, `.rpm` e AppImage. Ou dois cliques no arquivo |
 | 🎵 **Apps que todo mundo usa** | Spotify, Flameshot, conta-gotas de cor e OCR já vêm instalados |
+| 🎨 **Do seu jeito** | barra de cima em ilhas de vidro, cursor do macOS e o app **Personalizar** (`melon personalizar`): troca cursor e ícones com prévia, baixa temas (macOS, Bibata, Papirus, WhiteSur…) e muda o dock de lugar |
 | 🛡️ **Nunca quebra** | atualizações automáticas e atômicas, com volta à versão anterior pelo menu de boot |
 | ⚡ **Leve** | nada roda à toa: Docker, Android e Windows só ligam quando você usa |
 

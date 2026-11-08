@@ -10,3 +10,4 @@ picture-uri='file:///usr/share/backgrounds/watermelon/golden-hour-day.png'
 
 [org.gnome.desktop.interface]
 accent-color='red'
+cursor-theme='macOS'

@@ -23,6 +23,15 @@ disable-overview-on-startup=true
 monospace-font-name='JetBrains Mono 11'
 enable-hot-corners=false
 accent-color='red'
+cursor-theme='macOS'
+
+# Barra de cima em "ilhas de vidro" (tema em /usr/share/themes/Watermelon; troca no app Personalizar)
+[org/gnome/shell/extensions/user-theme]
+name='Watermelon'
+
+# As ilhas têm fundo próprio: o desfoque da barra inteira deixaria uma faixa por trás
+[org/gnome/shell/extensions/blur-my-shell/panel]
+blur=false
 
 [org/gnome/desktop/background]
 picture-uri='file:///usr/share/backgrounds/watermelon/golden-hour-day.png'

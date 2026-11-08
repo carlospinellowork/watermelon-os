@@ -13,6 +13,7 @@ ${RED}🍉 melon${OFF} — a ferramenta do WatermelonOS
 ${B}Uso:${OFF}
   melon setup git      Conecta ao GitHub, cria a chave SSH, envia e configura o Git
   melon install <arq>  Instala .exe .msi .apk .deb .rpm .AppImage .flatpakref
+  melon personalizar   Cursor, ícones, barra de cima e dock
   melon status         Versão do sistema e atualizações pendentes
   melon version        Versão do melon e do sistema
 
@@ -28,6 +29,8 @@ case "${1:-help}" in
     esac ;;
   install)
     shift; exec "$LIB/install" "$@" ;;
+  personalizar|customize)
+    exec "$LIB/customize" "${2:-}" ;;
   status)
     # shellcheck disable=SC1091
     . /usr/lib/os-release
