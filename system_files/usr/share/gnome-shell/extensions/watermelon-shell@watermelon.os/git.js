@@ -75,6 +75,8 @@ class GitIsland extends PanelMenu.Button {
 
         this._monitor = Gio.File.new_for_path(STATE_FILE).monitor_file(Gio.FileMonitorFlags.NONE, null);
         this._monitor.connect('changed', () => this._load());
+        // menu vazio não abre no GNOME: começa com um item e é remontado a cada abertura
+        this.menu.addMenuItem(new PopupMenu.PopupMenuItem('Carregando…', {reactive: false}));
         this.menu.connect('open-state-changed', (_m, open) => open && this._buildMenu());
         this._load();
         this._timer = GLib.timeout_add_seconds(GLib.PRIORITY_LOW, STATUS_INTERVAL, () => {

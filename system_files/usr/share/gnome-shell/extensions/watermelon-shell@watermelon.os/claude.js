@@ -58,6 +58,8 @@ class ClaudeIsland extends PanelMenu.Button {
         GLib.mkdir_with_parents(STATE_DIR, 0o755);
         this._monitor = Gio.File.new_for_path(STATE_DIR).monitor_directory(Gio.FileMonitorFlags.NONE, null);
         this._monitor.connect('changed', () => this._reload());
+        // menu vazio não abre no GNOME: começa com um item e é remontado a cada abertura
+        this.menu.addMenuItem(new PopupMenu.PopupMenuItem('Carregando…', {reactive: false}));
         this.menu.connect('open-state-changed', (_m, open) => open && this._buildMenu());
         this._reload();
         // reavalia de tempos em tempos ("pronto" expira, sessões antigas somem)

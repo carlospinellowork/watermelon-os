@@ -201,13 +201,13 @@ export class Palette {
 
     open() {
         const m = Main.layoutManager.primaryMonitor;
-        this._backdrop = new St.Widget({reactive: true, x: m.x, y: m.y, width: m.width, height: m.height,
-            style_class: 'wm-palette-backdrop'});
-        this._backdrop.connect('button-press-event', (_a, ev) => {
-            if (ev.get_source() === this._backdrop)
-                this.close();
-            return Clutter.EVENT_STOP;
-        });
+        // fundo escuro: é um botão atrás da caixa, que fecha a paleta ao clicar fora dela
+        // (no GNOME 51 os cliques são gestos: parar o evento no fundo cancelaria os cliques nos itens)
+        this._backdrop = new St.Widget({reactive: true, x: m.x, y: m.y, width: m.width, height: m.height});
+        const shield = new St.Button({style_class: 'wm-palette-backdrop', width: m.width, height: m.height,
+            can_focus: false});
+        shield.connect('clicked', () => this.close());
+        this._backdrop.add_child(shield);
         this._box = new St.BoxLayout({style_class: 'wm-palette', orientation: Clutter.Orientation.VERTICAL, width: 640});
         this._entry = new St.Entry({style_class: 'wm-palette-entry', hint_text: 'O que você quer fazer?', can_focus: true});
         this._entry.set_primary_icon(new St.Icon({icon_name: 'system-search-symbolic', style_class: 'wm-palette-search-icon'}));
@@ -223,7 +223,14 @@ export class Palette {
             this._sel = 0;
             this._refresh();
         });
-        this._entry.clutter_text.connect('key-press-event', (_a, ev) => this._key(ev.get_key_symbol()));
+        // teclado: ↑/↓/Esc/Enter (GNOME 51 usa controladores de eventos, não o sinal key-press-event)
+        const keys = new Clutter.KeyController();
+        keys.connect('key-press', () => {
+            const [, symbol] = keys.get_key();
+            return this._key(symbol);
+        });
+        this._entry.clutter_text.add_action(keys);
+        this._entry.clutter_text.connect('activate', () => this._activate(this._items[this._sel]));
         this._entry.grab_key_focus();
         this._sel = 0;
         this._refresh();
@@ -256,7 +263,7 @@ export class Palette {
             this._paintSelection();
             return Clutter.EVENT_STOP;
         }
-        if (sym === Clutter.KEY_Return || sym === Clutter.KEY_KP_Enter) {
+        if (sym === Clutter.KEY_Return || sym === Clutter.KEY_KP_Enter || sym === Clutter.KEY_ISO_Enter) {
             this._activate(this._items[this._sel]);
             return Clutter.EVENT_STOP;
         }
@@ -264,7 +271,7 @@ export class Palette {
     }
 
     _activate(cmd) {
-        if (!cmd)
+        if (!cmd || !this._backdrop)
             return;
         this.close();
         try {
