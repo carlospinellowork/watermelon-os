@@ -115,6 +115,9 @@ h2 { font-size: clamp(30px, 4.4vw, 46px); line-height: 1.1; letter-spacing: -1.2
 .card code { font-size: 13px; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
 
 /* prints */
+.barshot { margin: 0 0 28px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); background: #241d4a; }
+.barshot img { display: block; width: 100%; height: auto; }
+.barshot figcaption { padding: 10px 16px; font-size: 14px; color: var(--ink-soft); background: var(--surface); }
 .shots { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
 .shot { margin: 0; }
 .shot img { border-radius: 14px; border: 1px solid var(--line); box-shadow: var(--shadow); aspect-ratio: 16/10; object-fit: cover; width: 100%; }
@@ -176,6 +179,7 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
     <a class="brand" href="#"><img src="img/logo.svg" alt=""><span><b>watermelon</b>OS</span></a>
     <div class="links">
       <a href="#recursos">Recursos</a>
+      <a href="#barra">Barra</a>
       <a href="#telas">Telas</a>
       <a href="#atalhos">Atalhos</a>
       <a href="#terminal">Terminal</a>
@@ -218,12 +222,33 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
   </div>
 </section>
 
-<section id="telas" class="alt">
+<section id="barra" class="alt">
+  <div class="wrap">
+    <p class="eyebrow">Barra inteligente</p>
+    <h2>A barra que trabalha por você</h2>
+    <p class="section-lead">Três ilhas de vidro flutuando no topo da tela. Elas mostram em que branch você está, o que o Claude está fazendo, a música tocando e seus servidores rodando, e fazem as ações comuns com um clique.</p>
+    <figure class="barshot"><img src="img/barra.png" alt="Barra do WatermelonOS: menu melancia, ilha do Git em main com 1 commit para enviar, Claude trabalhando, relógio no centro, uso de CPU e memória, status do CI e ícones do sistema" loading="lazy"><figcaption><b>A barra de verdade.</b> Menu 🍉, ilha do Git (<code>main ↑1</code>), Claude trabalhando, relógio, CPU e memória, status do CI.</figcaption></figure>
+    <div class="grid">
+      <div class="card"><div class="ico">🧭</div><h3>Paleta de comandos</h3><p><kbd>⊞</kbd> <kbd>K</kbd> e digite o que quer: modo escuro, foco, Wi-Fi, print, abrir um repositório, encerrar a porta 3000, ou uma conta como <code>2*(3+4)</code>.</p></div>
+      <div class="card"><div class="ico">🌿</div><h3>Ilha do Git</h3><p>Branch, arquivos alterados e commits para enviar do projeto em que você está no terminal. Commit, push, pull, trocar de branch e criar PR com um clique, e o status dos checks do PR.</p></div>
+      <div class="card"><div class="ico">✳️</div><h3>Ilha do Claude</h3><p>Mostra quando o Claude Code está trabalhando, quando precisa da sua aprovação e quando terminou, mesmo com o terminal escondido. O menu traz as sessões e o uso recente.</p></div>
+      <div class="card"><div class="ico">🎵</div><h3>Ilha da música</h3><p>A capa e o nome da música entram na ilha do relógio, com controles ao passar o mouse. Funciona com Spotify, navegadores e qualquer player.</p></div>
+      <div class="card"><div class="ico">🔌</div><h3>Portas abertas</h3><p>Seus servidores de desenvolvimento aparecem na barra: <code>:3000 next dev</code>, <code>:5173 vite</code>. Um clique abre no navegador e outro encerra.</p></div>
+      <div class="card"><div class="ico">🚦</div><h3>GitHub Actions</h3><p>Uma bolinha verde, amarela ou vermelha com seus últimos builds, e uma notificação quando eles terminam.</p></div>
+      <div class="card"><div class="ico">🍅</div><h3>Modo foco</h3><p>Pomodoro de 25 minutos na barra, com as notificações em silêncio. Ao terminar, toca um som e começa a pausa.</p></div>
+      <div class="card"><div class="ico">🎨</div><h3>Do seu jeito</h3><p>O app <b>Personalizar</b> troca cursor, ícones, papel de parede, cores e fontes, muda o dock de lugar e liga ou desliga cada recurso da barra.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="telas">
   <div class="wrap">
     <p class="eyebrow">Telas</p>
     <h2>Bonito por padrão</h2>
-    <p class="section-lead">Visual limpo com dock, wallpaper original <i>Golden Hour</i> que muda do pôr do sol para a noite junto com o tema escuro, e a melancia em cada detalhe.</p>
+    <p class="section-lead">Visual neutro e limpo, no estilo macOS: barra em ilhas de vidro, botões 🔴🟡🟢 nas janelas, cursor do Mac, papéis de parede originais e sons do sistema próprios.</p>
     <div class="shots">
+      <figure class="shot"><img src="img/orbita.jpg" alt="Papel de parede Órbita: planeta com atmosfera rosada, estrelas e a melancia no centro" loading="lazy"><figcaption><b>Órbita.</b> O papel de parede padrão, gerado por código.</figcaption></figure>
+      <figure class="shot"><img src="img/vidro.jpg" alt="Papel de parede Vidro: cores desfocadas com um painel de vidro e a melancia" loading="lazy"><figcaption><b>Vidro.</b> Glassmorphism com versões clara e escura.</figcaption></figure>
       <figure class="shot"><img src="img/boas-vindas.png" alt="Assistente Bem-vindo ao WatermelonOS" loading="lazy"><figcaption><b>Boas-vindas.</b> O assistente abre sozinho no primeiro login.</figcaption></figure>
       <figure class="shot"><img src="img/perfis.png" alt="Escolha de perfis Fullstack, Mobile e Data/IA" loading="lazy"><figcaption><b>Perfis.</b> Escolha o que você desenvolve; a instalação roda em segundo plano.</figcaption></figure>
       <figure class="shot"><img src="img/aparencia.png" alt="Escolha de tema claro ou escuro" loading="lazy"><figcaption><b>Aparência.</b> Claro de dia, escuro de noite.</figcaption></figure>
@@ -234,14 +259,15 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
   </div>
 </section>
 
-<section id="atalhos">
+<section id="atalhos" class="alt">
   <div class="wrap">
     <p class="eyebrow">Atalhos</p>
     <h2>O melhor do Mac, do Windows e do Linux</h2>
-    <p class="section-lead">Os atalhos que você já conhece de outros sistemas funcionam aqui, e alguns que nenhum outro sistema tem.</p>
+    <p class="section-lead">Os atalhos que você já conhece de outros sistemas funcionam aqui, e alguns que nenhum outro sistema tem. <kbd>Super</kbd> é a tecla com o logo do Windows <kbd>⊞</kbd>, entre o Ctrl e o Alt.</p>
     <table class="keys">
       <thead><tr><th>Atalho</th><th>O que faz</th><th>Inspirado em</th></tr></thead>
       <tbody>
+        <tr><td><kbd>Super</kbd> <kbd>K</kbd></td><td>Paleta de comandos: digite o que quer fazer</td><td><span class="tag">🍎 Raycast</span></td></tr>
         <tr><td><kbd>Super</kbd> <kbd>Espaço</kbd></td><td>Busca: apps, arquivos, calculadora e configurações</td><td><span class="tag">🍎 Spotlight</span></td></tr>
         <tr><td><kbd>Espaço</kbd> num arquivo</td><td>Pré-visualiza sem abrir (imagens, PDFs, vídeos, código)</td><td><span class="tag">🍎 Quick Look</span></td></tr>
         <tr><td><kbd>Super</kbd> <kbd>V</kbd></td><td>Histórico da área de transferência (últimos 100 itens)</td><td><span class="tag">🪟 Windows</span></td></tr>
@@ -251,6 +277,7 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
         <tr><td><kbd>Super</kbd> <kbd>E</kbd></td><td>Abre os arquivos</td><td><span class="tag">🪟 Windows</span></td></tr>
         <tr><td><kbd>Super</kbd> <kbd>D</kbd></td><td>Mostra a área de trabalho</td><td><span class="tag">🪟 Windows</span></td></tr>
         <tr><td><kbd>Shift</kbd> <kbd>Super</kbd> <kbd>S</kbd></td><td>Print de uma área da tela (também <kbd>Print</kbd>)</td><td><span class="tag">🪟 Ferramenta de Captura</span></td></tr>
+        <tr><td><kbd>Shift</kbd> <kbd>Super</kbd> <kbd>R</kbd></td><td>Grava a tela em vídeo ou GIF</td><td><span class="tag">🍎 macOS</span></td></tr>
         <tr><td><kbd>Ctrl</kbd> <kbd>Print</kbd></td><td>Print com setas, textos e destaques (Flameshot)</td><td><span class="tag">🐧 Linux</span></td></tr>
         <tr><td><kbd>F12</kbd></td><td>Terminal suspenso que desce do topo da tela</td><td><span class="tag">🐧 Quake</span></td></tr>
         <tr><td><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>T</kbd></td><td>Abre o terminal</td><td><span class="tag">🐧 Linux</span></td></tr>
@@ -269,7 +296,7 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
   </div>
 </section>
 
-<section id="terminal" class="alt">
+<section id="terminal">
   <div class="wrap term-wrap">
     <div>
       <p class="eyebrow">Terminal</p>
@@ -282,6 +309,8 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
         <li><b>Prompt com git</b>: branch, alterações, versão do Node/Python e tempo do comando.</li>
         <li><b>lazygit, lazydocker, yazi, delta, fzf, ripgrep, zoxide, btop</b> e mais.</li>
         <li><b><code>z projeto</code></b> pula para qualquer pasta que você já visitou.</li>
+        <li><b>Cofre de envs</b>: <code>melon env</code> guarda seus <code>.env</code> criptografados e carrega sozinho ao entrar no projeto, com <code>🔐 dev</code> ou <code>🔐 PROD</code> no prompt.</li>
+        <li><b><code>melon limpar</code></b> acha lixo e caches, <b><code>melon seguranca</code></b> dá uma nota de segurança e <b><code>melon doctor</code></b> confere a saúde do sistema.</li>
       </ul>
     </div>
     <div class="term" role="img" aria-label="Exemplo do terminal do WatermelonOS">
@@ -307,7 +336,7 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
   </div>
 </section>
 
-<section id="instalar">
+<section id="instalar" class="alt">
   <div class="wrap">
     <p class="eyebrow">Instalar</p>
     <h2>Três jeitos de instalar, dois sem pendrive</h2>
@@ -340,7 +369,7 @@ footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: s
   </div>
 </section>
 
-<section class="alt">
+<section>
   <div class="wrap">
     <p class="eyebrow">Por dentro</p>
     <h2>Feito para não te deixar na mão</h2>

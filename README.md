@@ -22,6 +22,10 @@ Instale, entre no GitHub e no Claude, e em minutos seu computador está pronto p
 
 ## ✨ Recursos
 
+<p align="center">
+  <img src="docs/img/barra.png" alt="Barra do WatermelonOS: menu melancia, ilha do Git, Claude trabalhando, relógio, CPU e memória e status do CI" width="820">
+</p>
+
 | | |
 |---|---|
 | 👋 **Assistente de boas-vindas** | Wi-Fi, aparência, navegador, perfis, GitHub e Claude em poucos cliques |
@@ -52,10 +56,11 @@ Instale, entre no GitHub e no Claude, e em minutos seu computador está pronto p
 
 ## ⌨️ Atalhos
 
-O melhor do Mac, do Windows e do Linux:
+O melhor do Mac, do Windows e do Linux. <kbd>Super</kbd> é a tecla com o logo do Windows (⊞), entre o Ctrl e o Alt.
 
 | Atalho | O que faz | Inspirado em |
 |---|---|---|
+| <kbd>Super</kbd> + <kbd>K</kbd> | Paleta de comandos: tema, foco, portas, repositórios, contas… | 🍎 Raycast |
 | <kbd>Super</kbd> + <kbd>Espaço</kbd> | Busca: apps, arquivos, calculadora | 🍎 Spotlight |
 | <kbd>Espaço</kbd> num arquivo | Pré-visualiza sem abrir | 🍎 Quick Look |
 | <kbd>Super</kbd> + <kbd>V</kbd> | Histórico da área de transferência | 🪟 Windows |
@@ -65,6 +70,7 @@ O melhor do Mac, do Windows e do Linux:
 | <kbd>Super</kbd> + <kbd>E</kbd> | Arquivos | 🪟 Windows |
 | <kbd>Super</kbd> + <kbd>D</kbd> | Mostra a área de trabalho | 🪟 Windows |
 | <kbd>Shift</kbd> + <kbd>Super</kbd> + <kbd>S</kbd> | Print de uma área (também <kbd>Print</kbd>) | 🪟 Captura |
+| <kbd>Shift</kbd> + <kbd>Super</kbd> + <kbd>R</kbd> | Grava a tela em vídeo ou GIF (Kooha) | 🍎 macOS |
 | <kbd>Ctrl</kbd> + <kbd>Print</kbd> | Print com anotações (Flameshot) | 🐧 Linux |
 | <kbd>F12</kbd> | Terminal suspenso | 🐧 Quake |
 | <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd> | Terminal | 🐧 Linux |
@@ -82,7 +88,20 @@ Ghostty + zsh já configurados:
 - <kbd>Tab</kbd> com **busca e prévia** · <kbd>Ctrl</kbd>+<kbd>R</kbd> **histórico em tela cheia**
 - **prompt com git**, versões de Node/Python e tempo do comando
 - `lazygit` (`lg`), `lazydocker` (`ld`), `yazi` (`y`), `delta`, `fzf`, `ripgrep`, `zoxide` (`z`), `btop`, `tldr`
-- **comandos do sistema**: `melon setup git`, `melon install <arquivo>`, `melon status`
+- **comandos do sistema**:
+
+| Comando | O que faz |
+|---|---|
+| `melon setup git` | Login no GitHub, chave SSH criada e enviada, commits assinados |
+| `melon install <arquivo>` | Instala `.exe`, `.msi`, `.apk`, `.deb`, `.rpm`, AppImage; programas do Windows ganham atalho com ícone e .NET automático |
+| `melon env` | Cofre de variáveis do projeto (criptografado no chaveiro), carregado sozinho ao entrar na pasta; `init`, `edit`, `use dev\|prod`, `run` |
+| `melon limpar` | Acha lixo e caches (npm, pip, Docker, node_modules parados…), mostra o tamanho e só apaga o que você escolher |
+| `melon seguranca` | Confere firewall, criptografia, portas expostas, chaves SSH, `.env` no Git… e dá uma nota |
+| `melon doctor` | Saúde do sistema e das ferramentas de dev (`--corrigir` conserta o que der) |
+| `melon foco [min]` | Pomodoro na barra com notificações em silêncio |
+| `melon personalizar` | Cursor, ícones, papel de parede, cores, fontes, barra e dock |
+| `melon claude-ilha` | Liga a ilha do Claude na barra (hooks do Claude Code) |
+| `melon status` | Versão do sistema e atualizações pendentes |
 
 ## 🍉 Instalar
 
