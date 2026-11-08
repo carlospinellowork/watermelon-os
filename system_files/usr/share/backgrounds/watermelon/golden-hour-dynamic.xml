@@ -1,0 +1,10 @@
+<!-- Golden Hour dinâmico: noite até 6h, amanhece 6h–7h, dia 7h–17h, entardece 17h–18h, noite de novo.
+     A contagem começa à meia-noite (horário local). -->
+<background>
+  <starttime><year>2026</year><month>1</month><day>1</day><hour>0</hour><minute>0</minute><second>0</second></starttime>
+  <static><duration>21600.0</duration><file>/usr/share/backgrounds/watermelon/golden-hour-night.png</file></static>
+  <transition type="overlay"><duration>3600.0</duration><from>/usr/share/backgrounds/watermelon/golden-hour-night.png</from><to>/usr/share/backgrounds/watermelon/golden-hour-day.png</to></transition>
+  <static><duration>36000.0</duration><file>/usr/share/backgrounds/watermelon/golden-hour-day.png</file></static>
+  <transition type="overlay"><duration>3600.0</duration><from>/usr/share/backgrounds/watermelon/golden-hour-day.png</from><to>/usr/share/backgrounds/watermelon/golden-hour-night.png</to></transition>
+  <static><duration>21600.0</duration><file>/usr/share/backgrounds/watermelon/golden-hour-night.png</file></static>
+</background>

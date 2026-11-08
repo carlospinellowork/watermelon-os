@@ -1,12 +1,12 @@
 # Padrões do WatermelonOS para TODO o sistema (inclusive tela de login e criação de usuário)
 [org.gnome.desktop.background]
-picture-uri='file:///usr/share/backgrounds/watermelon/golden-hour-day.png'
-picture-uri-dark='file:///usr/share/backgrounds/watermelon/golden-hour-night.png'
+picture-uri='file:///usr/share/backgrounds/watermelon/orbit.png'
+picture-uri-dark='file:///usr/share/backgrounds/watermelon/orbit.png'
 picture-options='zoom'
-primary-color='#241d4a'
+primary-color='#120b26'
 
 [org.gnome.desktop.screensaver]
-picture-uri='file:///usr/share/backgrounds/watermelon/golden-hour-day.png'
+picture-uri='file:///usr/share/backgrounds/watermelon/orbit.png'
 
 [org.gnome.desktop.interface]
 accent-color='red'

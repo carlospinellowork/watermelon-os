@@ -1,0 +1,19 @@
+/* WatermelonOS — botões das janelas no estilo macOS (GTK 3). Ver traffic-lights-gtk4.css. */
+headerbar button.titlebutton,
+.titlebar button.titlebutton {
+  min-width: 14px;
+  min-height: 14px;
+  padding: 0;
+  margin: 0 4px;
+  border: none;
+  border-radius: 999px;
+  background-image: none;
+  color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+  -gtk-icon-shadow: none;
+}
+headerbar button.titlebutton.close, .titlebar button.titlebutton.close { background-color: #ff5f57; }
+headerbar button.titlebutton.minimize, .titlebar button.titlebutton.minimize { background-color: #febc2e; }
+headerbar button.titlebutton.maximize, .titlebar button.titlebutton.maximize { background-color: #28c840; }
+headerbar:hover button.titlebutton, .titlebar:hover button.titlebutton { color: rgba(0, 0, 0, 0.6); }
+headerbar:backdrop button.titlebutton, .titlebar:backdrop button.titlebutton { background-color: rgba(128, 128, 128, 0.35); }

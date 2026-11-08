@@ -2,9 +2,34 @@
 <!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
 <wallpapers>
   <wallpaper deleted="false">
+    <name>WatermelonOS Órbita</name>
+    <filename>/usr/share/backgrounds/watermelon/orbit.png</filename>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#120b26</pcolor>
+    <scolor>#04040a</scolor>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>WatermelonOS Vidro</name>
+    <filename>/usr/share/backgrounds/watermelon/glass-day.png</filename>
+    <filename-dark>/usr/share/backgrounds/watermelon/glass-night.png</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#7d5cff</pcolor>
+    <scolor>#ff5468</scolor>
+  </wallpaper>
+  <wallpaper deleted="false">
     <name>WatermelonOS Golden Hour</name>
     <filename>/usr/share/backgrounds/watermelon/golden-hour-day.png</filename>
     <filename-dark>/usr/share/backgrounds/watermelon/golden-hour-night.png</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#241d4a</pcolor>
+    <scolor>#0d1511</scolor>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>WatermelonOS Golden Hour (muda com o horário)</name>
+    <filename>/usr/share/backgrounds/watermelon/golden-hour-dynamic.xml</filename>
     <options>zoom</options>
     <shade_type>solid</shade_type>
     <pcolor>#241d4a</pcolor>

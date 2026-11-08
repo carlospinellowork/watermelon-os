@@ -1,0 +1,94 @@
+/* ---------------------------------------------------------------- ilha dinâmica */
+.wm-island {
+  spacing: 8px;
+  padding: 0 4px 0 2px;
+}
+.wm-island-art {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.10);
+  background-size: cover;
+}
+.wm-island-title {
+  font-weight: bold;
+  max-width: 220px;
+}
+.wm-island-controls { spacing: 2px; }
+.wm-island-btn {
+  border-radius: 999px;
+  padding: 3px;
+}
+.wm-island-btn:hover { background-color: rgba(255, 255, 255, 0.16); }
+.wm-island-btn StIcon { icon-size: 14px; }
+.wm-island-bars { spacing: 2px; }
+.wm-island-bar {
+  width: 3px;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
+
+/* ---------------------------------------------------------------- status do GitHub */
+.wm-ci-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.45);
+}
+.wm-ci-dot.success { background-color: #30d158; }
+.wm-ci-dot.failure { background-color: #ff453a; }
+.wm-ci-dot.running { background-color: #ffd60a; }
+.wm-ci-label { font-weight: bold; font-size: 11px; }
+
+/* ---------------------------------------------------------------- widgets da área de trabalho */
+.wm-widgets { spacing: 14px; }
+.wm-card {
+  background-color: rgba(28, 28, 30, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 24px;
+  padding: 18px 22px;
+  color: #ffffff;
+  min-width: 250px;
+}
+.wm-clock-time {
+  font-size: 54px;
+  font-weight: 300;
+  letter-spacing: -1px;
+}
+.wm-clock-date {
+  font-size: 15px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.75);
+}
+.wm-card-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+}
+.wm-stat { spacing: 6px; margin-bottom: 8px; }
+.wm-stat-label { font-size: 13px; font-weight: bold; }
+.wm-stat-track {
+  height: 6px;
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+.wm-stat-fill {
+  height: 6px;
+  border-radius: 999px;
+  background-color: #ffffff;
+}
+.wm-music { spacing: 12px; }
+.wm-music-art {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.10);
+  background-size: cover;
+}
+.wm-music-title { font-weight: bold; font-size: 14px; max-width: 170px; }
+.wm-music-artist { font-size: 12px; color: rgba(255, 255, 255, 0.7); max-width: 170px; }
+.wm-music-controls { spacing: 6px; margin-top: 6px; }
+.wm-music-btn { border-radius: 999px; padding: 6px; }
+.wm-music-btn:hover { background-color: rgba(255, 255, 255, 0.16); }
+.wm-music-btn StIcon { icon-size: 16px; }

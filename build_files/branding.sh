@@ -99,8 +99,10 @@ rm -f /etc/yum.repos.d/_copr* /etc/yum.repos.d/fedora-cisco-openh264.repo.rpmsav
 T=/usr/share/plymouth/themes/watermelon
 mkdir -p "$T"
 cp -a /usr/share/plymouth/themes/spinner/. "$T/"
-rm -f "$T/spinner.plymouth" "$T/watermark.png"
-svg2png "$B/logo.svg" 180 180 "$T/watermark.png"
+rm -f "$T/spinner.plymouth" "$T/watermark.png" "$T"/throbber-*.png
+svg2png "$B/logo.svg" 200 200 "$T/watermark.png"
+# "carregando" estilo macOS (raios brancos), gerado por branding/plymouth/throbber.py
+cp "$B"/plymouth/throbber-*.png "$T/"
 cat > "$T/watermelon.plymouth" <<'EOF'
 [Plymouth Theme]
 Name=WatermelonOS
@@ -121,8 +123,8 @@ WatermarkHorizontalAlignment=.5
 WatermarkVerticalAlignment=.45
 Transition=none
 TransitionDuration=0.0
-BackgroundStartColor=0x0d1511
-BackgroundEndColor=0x0d1511
+BackgroundStartColor=0x000000
+BackgroundEndColor=0x000000
 MessageBelowAnimation=true
 
 [boot-up]

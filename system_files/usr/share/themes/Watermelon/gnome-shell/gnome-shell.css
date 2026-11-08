@@ -99,3 +99,39 @@
 #dashtodockContainer .show-apps:hover .overview-icon {
   background-color: rgba(255, 255, 255, 0.14);
 }
+
+/* ------------------------------------------------------------ tela de bloqueio (estilo macOS) */
+.unlock-dialog-clock {
+  spacing: 0.4em;
+}
+.unlock-dialog-clock .unlock-dialog-clock-date {
+  font-size: 1.6em;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+.unlock-dialog-clock .unlock-dialog-clock-time {
+  font-size: 9em;
+  font-weight: 700;
+  letter-spacing: -2px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.unlock-dialog-clock .unlock-dialog-clock-hint {
+  margin-top: 3em;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+}
+.unlock-dialog .login-dialog-prompt-entry {
+  border-radius: 999px;
+  background-color: rgba(28, 28, 30, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+.unlock-dialog-notifications-container .unlock-dialog-notification-source {
+  border-radius: 999px;
+  background-color: rgba(28, 28, 30, 0.55);
+}
+
+/* ------------------------------------------------------------ menu 🍉 e indicador do GitHub (watermelon-shell) */
+#panel .panel-button .wm-ci-dot {
+  margin: 0 2px;
+}

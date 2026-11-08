@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.watermelon-shell" path="/org/gnome/shell/extensions/watermelon-shell/">
+    <key name="island" type="b">
+      <default>true</default>
+      <summary>Ilha dinâmica: a música tocando aparece junto do relógio</summary>
+    </key>
+    <key name="melon-menu" type="b">
+      <default>true</default>
+      <summary>Menu 🍉 no canto esquerdo da barra</summary>
+    </key>
+    <key name="github-status" type="b">
+      <default>true</default>
+      <summary>Status do GitHub Actions na barra</summary>
+    </key>
+    <key name="github-repos" type="as">
+      <default>[]</default>
+      <summary>Repositórios acompanhados (dono/nome). Vazio: os 4 com push mais recente</summary>
+    </key>
+    <key name="widgets" type="b">
+      <default>true</default>
+      <summary>Widgets na área de trabalho (relógio, sistema e música)</summary>
+    </key>
+  </schema>
+</schemalist>

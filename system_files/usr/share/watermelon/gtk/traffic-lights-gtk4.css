@@ -1,0 +1,40 @@
+/* WatermelonOS — botões das janelas no estilo macOS (GTK 4 / libadwaita).
+ * 🔴 fechar · 🟡 minimizar · 🟢 maximizar. Os símbolos aparecem ao passar o mouse;
+ * em janelas no fundo as bolinhas ficam cinza.
+ * Ativado por ~/.config/gtk-4.0/gtk.css (@import), que o app Personalizar liga e desliga. */
+windowcontrols { border-spacing: 8px; }
+windowcontrols > button {
+  min-width: 14px;
+  min-height: 14px;
+  padding: 0;
+  margin: 0;
+  background: none;
+  box-shadow: none;
+}
+windowcontrols > button > image {
+  min-width: 14px;
+  min-height: 14px;
+  padding: 0;
+  border-radius: 999px;
+  -gtk-icon-size: 10px;
+  color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+  transition: color 120ms ease;
+}
+windowcontrols > button.close > image,
+windowcontrols > button.close:hover > image,
+windowcontrols > button.close:active > image { background-color: #ff5f57; }
+windowcontrols > button.minimize > image,
+windowcontrols > button.minimize:hover > image,
+windowcontrols > button.minimize:active > image { background-color: #febc2e; }
+windowcontrols > button.maximize > image,
+windowcontrols > button.maximize:hover > image,
+windowcontrols > button.maximize:active > image { background-color: #28c840; }
+windowcontrols:hover > button > image { color: rgba(0, 0, 0, 0.6); }
+windowcontrols > button:active > image { filter: brightness(0.85); }
+
+/* janela no fundo: cinza (como no Mac) */
+window:backdrop windowcontrols:not(:hover) > button > image {
+  background-color: alpha(currentColor, 0);
+  box-shadow: inset 0 0 0 14px rgba(128, 128, 128, 0.35);
+}

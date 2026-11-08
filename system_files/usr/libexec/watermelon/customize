@@ -25,7 +25,8 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Adw, Gdk, GdkPixbuf, Gio, GLib, Gtk, Pango  # noqa: E402
 
 APP_ID = "os.watermelon.Customize"
 USER_ICONS = os.path.join(GLib.get_user_data_dir(), "icons")
@@ -95,6 +96,17 @@ CSS = """
 .wm-card { padding: 12px; }
 .wm-title { font-weight: 700; }
 .wm-inuse { color: @accent_color; font-weight: 700; }
+.wm-thumb { border-radius: 10px; }
+.wm-accent:checked { outline: 3px solid @view_fg_color; outline-offset: 2px; }
+.wm-accent-blue { background: #3584e4; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-teal { background: #2190a4; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-green { background: #3a944a; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-yellow { background: #c88800; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-orange { background: #ed5b00; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-red { background: #e62d42; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-pink { background: #d56199; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-purple { background: #9141ac; min-width: 26px; min-height: 26px; padding: 0; }
+.wm-accent-slate { background: #6f8396; min-width: 26px; min-height: 26px; padding: 0; }
 """
 
 
@@ -252,6 +264,7 @@ def install_entry(entry):
 # ------------------------------------------------------------------ extensões do shell
 ARC_UUID = "watermelon-arc-dock@watermelon.os"
 DOCK_UUID = "dash-to-dock@micxgx.gmail.com"
+SHELL_UUID = "watermelon-shell@watermelon.os"
 
 
 def extension_dir(uuid):
@@ -262,9 +275,9 @@ def extension_dir(uuid):
     return None
 
 
-def arc_settings():
-    """Configurações do Dock em Arco (o schema fica dentro da pasta da extensão)."""
-    d = extension_dir(ARC_UUID)
+def ext_settings(uuid, schema_id):
+    """Configurações de uma extensão (o schema fica dentro da pasta dela)."""
+    d = extension_dir(uuid)
     if not d or not os.path.isdir(os.path.join(d, "schemas")):
         return None
     try:
@@ -272,8 +285,12 @@ def arc_settings():
                                                           Gio.SettingsSchemaSource.get_default(), False)
     except GLib.Error:
         return None
-    schema = src.lookup("org.gnome.shell.extensions.watermelon-arc-dock", False)
+    schema = src.lookup(schema_id, False)
     return Gio.Settings.new_full(schema, None, None) if schema else None
+
+
+def arc_settings():
+    return ext_settings(ARC_UUID, "org.gnome.shell.extensions.watermelon-arc-dock")
 
 
 def extension_enabled(uuid):
@@ -572,16 +589,252 @@ class BarPage(Adw.PreferencesPage):
             sync_rows()
             self.add(g)
 
+        # extras do WatermelonOS (extensão watermelon-shell)
+        ws = ext_settings(SHELL_UUID, "org.gnome.shell.extensions.watermelon-shell")
+        if ws:
+            x = Adw.PreferencesGroup(title="Extras",
+                                     description="Recursos do WatermelonOS na barra e na área de trabalho")
+            for key, title, sub in (
+                    ("island", "Ilha dinâmica", "A música tocando aparece junto do relógio, com controles"),
+                    ("melon-menu", "Menu 🍉", "Atalhos do sistema no canto esquerdo da barra"),
+                    ("github-status", "Status do GitHub Actions", "Bolinha verde, amarela ou vermelha com seus builds"),
+                    ("widgets", "Widgets na área de trabalho", "Relógio, uso do sistema e música")):
+                row = Adw.SwitchRow(title=title, subtitle=sub)
+                ws.bind(key, row, "active", Gio.SettingsBindFlags.DEFAULT)
+                row.connect("notify::active", lambda r, _p: r.get_active() and not extension_enabled(SHELL_UUID)
+                            and set_extension(SHELL_UUID, True))
+                x.add(row)
+            repos = Adw.EntryRow(title="Repositórios do GitHub (dono/nome, separados por vírgula; vazio = automático)",
+                                 show_apply_button=True)
+            repos.set_text(", ".join(ws.get_strv("github-repos")))
+            repos.connect("apply", lambda r: ws.set_strv(
+                "github-repos", [t.strip() for t in r.get_text().split(",") if t.strip()]))
+            x.add(repos)
+            self.add(x)
+
+
+# ------------------------------------------------------------------ papel de parede
+BG_PROPS = [os.path.join(d, "gnome-background-properties") for d in
+            [GLib.get_user_data_dir(), *GLib.get_system_data_dirs()]]
+
+
+def wallpapers():
+    """Lista (nome, arquivo, arquivo escuro, miniatura) dos papéis de parede registrados no sistema."""
+    import xml.etree.ElementTree as ET
+    out, seen = [], set()
+    for d in BG_PROPS:
+        if not os.path.isdir(d):
+            continue
+        for f in sorted(os.listdir(d)):
+            try:
+                root = ET.parse(os.path.join(d, f)).getroot()
+            except (ET.ParseError, OSError):
+                continue
+            for w in root.iter("wallpaper"):
+                if w.get("deleted") == "true":
+                    continue
+                fn = (w.findtext("filename") or "").strip()
+                if not fn or fn in seen or not os.path.exists(fn):
+                    continue
+                seen.add(fn)
+                dark = (w.findtext("filename-dark") or "").strip() or fn
+                out.append((w.findtext("name") or os.path.basename(fn), fn, dark, thumb_source(fn)))
+    return out
+
+
+def thumb_source(path):
+    """Para um XML dinâmico, usa a primeira imagem do dia como miniatura."""
+    if not path.endswith(".xml"):
+        return path
+    import xml.etree.ElementTree as ET
+    try:
+        files = [e.text.strip() for e in ET.parse(path).getroot().iter("file") if e.text]
+    except (ET.ParseError, OSError):
+        return None
+    day = [f for f in files if "day" in f]
+    return (day or files or [None])[0]
+
+
+class WallpaperPage(Gtk.ScrolledWindow):
+    def __init__(self, win):
+        super().__init__(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        self.win = win
+        self.bg = Gio.Settings.new("org.gnome.desktop.background")
+        clamp = Adw.Clamp(maximum_size=960, margin_top=18, margin_bottom=24, margin_start=18, margin_end=18)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        head = Gtk.Box(spacing=12)
+        head.append(Gtk.Label(label="Papéis de parede", css_classes=["title-4"], hexpand=True, xalign=0))
+        pick = Gtk.Button(label="Escolher uma imagem…", css_classes=["flat"])
+        pick.connect("clicked", self.on_pick)
+        head.append(pick)
+        box.append(head)
+        self.flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+                                min_children_per_line=1, max_children_per_line=3,
+                                row_spacing=12, column_spacing=12)
+        box.append(self.flow)
+        clamp.set_child(box)
+        self.set_child(clamp)
+        self.bg.connect("changed::picture-uri", lambda *_: self.refresh())
+        self.refresh()
+
+    def refresh(self):
+        current = self.bg.get_string("picture-uri")
+        self.flow.remove_all()
+        for name, fn, dark, thumb in wallpapers():
+            card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, css_classes=["card", "wm-card"])
+            pic = Gtk.Picture(content_fit=Gtk.ContentFit.COVER, height_request=150, css_classes=["wm-thumb"])
+            if thumb:
+                try:
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb, 480, 270, True)
+                    _ok, png = pb.save_to_bufferv("png", [], [])
+                    pic.set_paintable(Gdk.Texture.new_from_bytes(GLib.Bytes.new(png)))
+                except GLib.Error:
+                    pass
+            card.append(pic)
+            row = Gtk.Box(spacing=8)
+            label = name + ("  ·  dinâmico" if fn.endswith(".xml") else "")
+            row.append(Gtk.Label(label=label, css_classes=["wm-title"], xalign=0, hexpand=True,
+                                 ellipsize=3))
+            if current == Gio.File.new_for_path(fn).get_uri():
+                row.append(Gtk.Label(label="✓ Em uso", css_classes=["wm-inuse"]))
+            else:
+                b = Gtk.Button(label="Usar", css_classes=["suggested-action", "pill"])
+                b.connect("clicked", lambda _b, f=fn, d=dark: self.apply(f, d))
+                row.append(b)
+            card.append(row)
+            self.flow.append(card)
+
+    def apply(self, fn, dark):
+        self.bg.set_string("picture-uri", Gio.File.new_for_path(fn).get_uri())
+        self.bg.set_string("picture-uri-dark", Gio.File.new_for_path(dark).get_uri())
+        self.bg.set_string("picture-options", "zoom")
+        self.win.toast("Papel de parede aplicado")
+
+    def on_pick(self, _b):
+        dialog = Gtk.FileDialog(title="Escolha uma imagem")
+        flt = Gtk.FileFilter(name="Imagens")
+        flt.add_mime_type("image/*")
+        store = Gio.ListStore.new(Gtk.FileFilter)
+        store.append(flt)
+        dialog.set_filters(store)
+
+        def picked(d, res):
+            try:
+                f = d.open_finish(res)
+            except GLib.Error:
+                return
+            self.apply(f.get_path(), f.get_path())
+        dialog.open(self.win, None, picked)
+
+
+# ------------------------------------------------------------------ botões estilo macOS (CSS do GTK)
+TL_MARK = "/* watermelon: botões macOS */"
+TL_FILES = {"gtk-4.0": "/usr/share/watermelon/gtk/traffic-lights-gtk4.css",
+            "gtk-3.0": "/usr/share/watermelon/gtk/traffic-lights-gtk3.css"}
+
+
+def _gtk_css(ver):
+    return os.path.join(GLib.get_user_config_dir(), ver, "gtk.css")
+
+
+def traffic_lights_enabled():
+    try:
+        with open(_gtk_css("gtk-4.0")) as f:
+            return TL_MARK in f.read()
+    except OSError:
+        return False
+
+
+def set_traffic_lights(on):
+    """Liga/desliga só a nossa linha no gtk.css, sem mexer no resto que a pessoa tiver escrito."""
+    for ver, css in TL_FILES.items():
+        path = _gtk_css(ver)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            with open(path) as f:
+                lines = [ln for ln in f.read().splitlines() if TL_MARK not in ln]
+        except OSError:
+            lines = []
+        if on:
+            lines.insert(0, f'@import url("file://{css}"); {TL_MARK}')
+        with open(path, "w") as f:
+            f.write("\n".join(lines) + ("\n" if lines else ""))
+
+
+# ------------------------------------------------------------------ cores e fontes
+ACCENTS = [("blue", "#3584e4"), ("teal", "#2190a4"), ("green", "#3a944a"), ("yellow", "#c88800"),
+           ("orange", "#ed5b00"), ("red", "#e62d42"), ("pink", "#d56199"), ("purple", "#9141ac"),
+           ("slate", "#6f8396")]
+ACCENT_NAMES = {"blue": "Azul", "teal": "Turquesa", "green": "Verde", "yellow": "Amarelo", "orange": "Laranja",
+                "red": "Vermelho", "pink": "Rosa", "purple": "Roxo", "slate": "Grafite"}
+
+
+class LookPage(Adw.PreferencesPage):
+    def __init__(self, win):
+        super().__init__()
+        iface = Gio.Settings.new("org.gnome.desktop.interface")
+
+        g = Adw.PreferencesGroup(title="Aparência")
+        schemes = [("default", "Claro"), ("prefer-dark", "Escuro")]
+        mode = Adw.ComboRow(title="Estilo", model=Gtk.StringList.new([s[1] for s in schemes]))
+        keys = [s[0] for s in schemes]
+        cur = iface.get_string("color-scheme")
+        mode.set_selected(1 if cur == "prefer-dark" else 0)
+        mode.connect("notify::selected", lambda r, _p: iface.set_string("color-scheme", keys[r.get_selected()]))
+        g.add(mode)
+
+        accent_row = Adw.ActionRow(title="Cor de destaque", subtitle="Botões, seleção e interruptores")
+        colors = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
+        first = None
+        for name, hexcolor in ACCENTS:
+            b = Gtk.ToggleButton(css_classes=["wm-accent", f"wm-accent-{name}", "circular"],
+                                 tooltip_text=ACCENT_NAMES[name], width_request=30, height_request=30)
+            if first:
+                b.set_group(first)
+            else:
+                first = b
+            b.set_active(iface.get_string("accent-color") == name)
+            b.connect("toggled", lambda btn, n=name: btn.get_active() and iface.set_string("accent-color", n))
+            colors.append(b)
+        accent_row.add_suffix(colors)
+        g.add(accent_row)
+        self.add(g)
+
+        tl = Adw.SwitchRow(title="Botões coloridos nas janelas (estilo macOS)",
+                           subtitle="🔴 fechar · 🟡 minimizar · 🟢 maximizar. Vale para apps abertos depois")
+        tl.set_active(traffic_lights_enabled())
+        tl.connect("notify::active", lambda r, _p: set_traffic_lights(r.get_active()))
+        g.add(tl)
+
+        f = Adw.PreferencesGroup(title="Fontes")
+        for key, title in (("font-name", "Interface"), ("document-font-name", "Documentos"),
+                           ("monospace-font-name", "Código e terminal")):
+            row = Adw.ActionRow(title=title)
+            btn = Gtk.FontDialogButton(dialog=Gtk.FontDialog(), valign=Gtk.Align.CENTER, use_font=True)
+            btn.set_font_desc(Pango.FontDescription.from_string(iface.get_string(key)))
+            btn.connect("notify::font-desc", lambda b, _p, k=key: iface.set_string(k, b.get_font_desc().to_string()))
+            row.add_suffix(btn)
+            f.add(row)
+        scale = Adw.SpinRow.new_with_range(0.8, 1.6, 0.05)
+        scale.set_title("Tamanho do texto")
+        scale.set_subtitle("1,00 = padrão")
+        scale.set_digits(2)
+        iface.bind("text-scaling-factor", scale, "value", Gio.SettingsBindFlags.DEFAULT)
+        f.add(scale)
+        self.add(f)
+
 
 class Window(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Personalizar", default_width=980, default_height=720)
+        super().__init__(application=app, title="Personalizar", default_width=1060, default_height=740)
         self.toasts = Adw.ToastOverlay()
         stack = Adw.ViewStack()
         stack.add_titled_with_icon(ThemePage(self, "cursor"), "cursor", "Cursor", "input-mouse-symbolic")
         stack.add_titled_with_icon(ThemePage(self, "icon"), "icons", "Ícones", "folder-pictures-symbolic")
         stack.add_titled_with_icon(BarPage(self), "bar", "Barra e Dock", "view-grid-symbolic")
-        if START_PAGE in ("cursor", "icons", "bar"):
+        stack.add_titled_with_icon(WallpaperPage(self), "wallpaper", "Papel de parede", "image-x-generic-symbolic")
+        stack.add_titled_with_icon(LookPage(self), "look", "Cores e fontes", "applications-graphics-symbolic")
+        if START_PAGE in ("cursor", "icons", "bar", "wallpaper", "look"):
             stack.set_visible_child_name(START_PAGE)
         header = Adw.HeaderBar(title_widget=Adw.ViewSwitcher(stack=stack, policy=Adw.ViewSwitcherPolicy.WIDE))
         view = Adw.ToolbarView(content=stack)

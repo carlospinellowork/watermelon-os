@@ -19,6 +19,21 @@ if ! command -v claude >/dev/null 2>&1 && [ ! -x "$HOME/.local/bin/claude" ]; th
   curl -fsSL https://claude.ai/install.sh | bash
 fi
 
+# Botões das janelas estilo macOS: só na primeira vez (depois quem manda é o app Personalizar)
+if [ ! -f "$STATE/traffic-lights.done" ]; then
+  for v in 4 3; do
+    css="$HOME/.config/gtk-$v.0/gtk.css"
+    mkdir -p "$(dirname "$css")"
+    grep -q 'watermelon: botões macOS' "$css" 2>/dev/null \
+      || sed -i "1i @import url(\"file:///usr/share/watermelon/gtk/traffic-lights-gtk$v.css\"); /* watermelon: botões macOS */" "$css" 2>/dev/null \
+      || echo "@import url(\"file:///usr/share/watermelon/gtk/traffic-lights-gtk$v.css\"); /* watermelon: botões macOS */" > "$css"
+  done
+  # apps Flatpak leem o mesmo CSS (e o arquivo importado, em /usr/share)
+  flatpak override --user --filesystem=xdg-config/gtk-4.0:ro --filesystem=xdg-config/gtk-3.0:ro \
+    --filesystem=/usr/share/watermelon/gtk:ro 2>/dev/null || true
+  touch "$STATE/traffic-lights.done"
+fi
+
 # Cache de exemplos do tldr (tealdeer)
 command -v tldr >/dev/null 2>&1 && tldr --update >/dev/null 2>&1 || true
 
