@@ -26,6 +26,8 @@ gum
 mkcert
 fastfetch
 unzip
+cloud-utils-growpart
+efibootmgr
 fish
 tmux
 git

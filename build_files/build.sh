@@ -69,9 +69,11 @@ systemctl enable docker.socket
 systemctl disable waydroid-container.service 2>/dev/null || true   # Android só liga quando usado
 systemctl enable watermelon-groups.service
 systemctl enable watermelon-flatpak-preinstall.service
+systemctl enable watermelon-boot-setup.service
 systemctl --global enable watermelon-user-setup.service
 
 # ---------------------------------------------------------------- GNOME (padrões do sistema)
+glib-compile-schemas /usr/share/glib-2.0/schemas
 dconf update
 
 # ---------------------------------------------------------------- limpeza

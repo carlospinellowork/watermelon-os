@@ -1,0 +1,11 @@
+[Unit]
+Description=WatermelonOS: menu de boot (dual boot com Windows), nome UEFI e expansão do disco
+After=local-fs.target boot.mount
+RequiresMountsFor=/boot /sysroot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/watermelon/boot-setup
+
+[Install]
+WantedBy=multi-user.target
