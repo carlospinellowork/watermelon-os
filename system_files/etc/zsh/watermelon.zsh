@@ -90,6 +90,7 @@ _wm_cmd_done() {
   local title="✅ Terminou em ${dt}s"
   (( rc )) && title="❌ Falhou em ${dt}s (código $rc)"
   notify-send -a "Terminal" -i utilities-terminal "$title" "${_wm_cmd[1,90]}" 2>/dev/null
+  (( $+commands[canberra-gtk-play] )) && { canberra-gtk-play -i ${${rc:#0}:+dialog-error}${${(M)rc:#0}:+complete} >/dev/null 2>&1 & } 2>/dev/null
   return 0
 }
 add-zsh-hook preexec _wm_cmd_start
@@ -130,3 +131,18 @@ _melon_vault() {
 }
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd _melon_vault
+
+# ------------------------------------------------------------ projeto atual (ilha do Git na barra)
+# Grava a raiz do repositório em que você está; fora de repositórios mantém o último.
+typeset -g _MELON_LAST_PROJECT=
+_melon_project() {
+  local d=$PWD
+  while [[ $d != / && ! -e $d/.git ]]; do d=${d:h}; done
+  [[ $d == / || $d == $_MELON_LAST_PROJECT ]] && return
+  _MELON_LAST_PROJECT=$d
+  local f=${XDG_STATE_HOME:-$HOME/.local/state}/watermelon/current-project
+  [[ -d ${f:h} ]] || mkdir -p ${f:h}
+  print -r -- $d >| $f
+}
+add-zsh-hook chpwd _melon_project
+_melon_project

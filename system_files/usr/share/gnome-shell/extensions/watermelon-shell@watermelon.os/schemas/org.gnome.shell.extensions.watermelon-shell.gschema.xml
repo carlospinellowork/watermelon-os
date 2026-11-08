@@ -21,5 +21,47 @@
       <default>true</default>
       <summary>Widgets na área de trabalho (relógio, sistema e música)</summary>
     </key>
+    <key name="ports" type="b">
+      <default>true</default>
+      <summary>Portas abertas (servidores de desenvolvimento) na barra</summary>
+    </key>
+    <key name="git-island" type="b">
+      <default>true</default>
+      <summary>Ilha do Git: branch e mudanças do projeto em que você está no terminal</summary>
+    </key>
+    <key name="claude-island" type="b">
+      <default>true</default>
+      <summary>Ilha do Claude: trabalhando, precisa de você, pronto e uso</summary>
+    </key>
+    <key name="island-notifications" type="b">
+      <default>true</default>
+      <summary>Notificações aparecem rapidinho na ilha do relógio</summary>
+    </key>
+    <key name="palette" type="b">
+      <default>true</default>
+      <summary>Paleta de comandos (Super+K)</summary>
+    </key>
+    <key name="palette-shortcut" type="as">
+      <default>['&lt;Super&gt;k']</default>
+      <summary>Atalho da paleta de comandos</summary>
+    </key>
+    <key name="focus" type="b">
+      <default>true</default>
+      <summary>Modo foco com Pomodoro</summary>
+    </key>
+    <key name="focus-active" type="b">
+      <default>false</default>
+      <summary>Foco rodando agora (liga/desliga o Pomodoro)</summary>
+    </key>
+    <key name="focus-minutes" type="i">
+      <range min="5" max="120"/>
+      <default>25</default>
+      <summary>Minutos de foco</summary>
+    </key>
+    <key name="break-minutes" type="i">
+      <range min="1" max="60"/>
+      <default>5</default>
+      <summary>Minutos de pausa</summary>
+    </key>
   </schema>
 </schemalist>

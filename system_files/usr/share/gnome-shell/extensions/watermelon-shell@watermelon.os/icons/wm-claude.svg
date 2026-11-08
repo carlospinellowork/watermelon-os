@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <!-- faísca de raios (desenho próprio) na cor do Claude -->
+  <g stroke="#d97757" stroke-width="2.1" stroke-linecap="round">
+    <path d="M9.29 8.54L14.65 10.76"/><path d="M8.54 9.29L10.14 13.17"/><path d="M7.46 9.29L5.24 14.65"/><path d="M6.71 8.54L2.83 10.14"/><path d="M6.71 7.46L1.35 5.24"/><path d="M7.46 6.71L5.86 2.83"/><path d="M8.54 6.71L10.76 1.35"/><path d="M9.29 7.46L13.17 5.86"/>
+  </g>
+</svg>

@@ -35,6 +35,13 @@ Instale, entre no GitHub e no Claude, e em minutos seu computador está pronto p
 | 🏝️ **Ilha dinâmica** | a música tocando aparece junto do relógio, com capa e controles |
 | 🚦 **GitHub na barra** | bolinha verde/amarela/vermelha com seus builds do GitHub Actions, e aviso quando terminam |
 | 🍉 **Menu melancia, widgets e Dock em Arco** | atalhos do sistema no canto, relógio/sistema/música na área de trabalho e dock que abre em arco na lateral |
+| 🧭 **Paleta de comandos** | <kbd>Super</kbd>+<kbd>K</kbd>: tema, foco, Wi-Fi, print, portas, repositórios, calculadora… tudo digitando |
+| 🌿 **Ilhas de Git e Claude** | branch e mudanças do projeto atual (commit, push, PR); o Claude Code avisa quando está trabalhando, precisa de você ou terminou |
+| 🔌 **Portas abertas** | seus servidores de dev (localhost:3000…) na barra: abrir no navegador ou encerrar |
+| 🍅 **Modo foco** | Pomodoro na barra com não perturbe (`melon foco`) |
+| 🔐 **Cofre de envs** | `melon env`: variáveis dos projetos criptografadas no chaveiro, carregadas sozinhas ao entrar na pasta, modo dev/PROD no prompt |
+| 🧹 **Manutenção** | `melon limpar` (lixo e caches), `melon seguranca` (nota de segurança), `melon doctor` (saúde do sistema) |
+| 🎬 **Gravar a tela** | <kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>: vídeo ou GIF (Kooha) · sons do sistema próprios |
 | 🛡️ **Nunca quebra** | atualizações automáticas e atômicas, com volta à versão anterior pelo menu de boot |
 | ⚡ **Leve** | nada roda à toa: Docker, Android e Windows só ligam quando você usa |
 

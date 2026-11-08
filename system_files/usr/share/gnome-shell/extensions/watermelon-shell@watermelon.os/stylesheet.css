@@ -92,3 +92,58 @@
 .wm-music-btn { border-radius: 999px; padding: 6px; }
 .wm-music-btn:hover { background-color: rgba(255, 255, 255, 0.16); }
 .wm-music-btn StIcon { icon-size: 16px; }
+
+/* ---------------------------------------------------------------- ilhas de Git e Claude */
+.wm-chip { spacing: 6px; }
+.wm-chip-icon { icon-size: 16px; }
+.wm-chip-label { font-weight: bold; font-size: 12px; }
+.wm-claude-working .wm-chip-label { color: #f0a988; }
+.wm-claude-waiting .wm-chip-label { color: #ffd60a; }
+.wm-claude-done .wm-chip-label { color: #30d158; }
+.wm-menu-title { font-weight: 800; }
+.wm-mono { font-family: monospace; font-size: 12px; }
+.wm-dim { color: rgba(255, 255, 255, 0.55); font-size: 12px; }
+
+/* ---------------------------------------------------------------- portas */
+.wm-ports-count { font-weight: bold; font-size: 12px; margin-left: 2px; }
+.wm-port-kill { border-radius: 999px; padding: 2px; }
+.wm-port-kill:hover { background-color: rgba(255, 69, 58, 0.35); }
+
+/* ---------------------------------------------------------------- foco / Pomodoro */
+.wm-focus { border-radius: 999px; padding: 0 8px; margin-left: 4px; }
+.wm-focus:hover { background-color: rgba(255, 255, 255, 0.14); }
+.wm-focus-label { font-weight: bold; font-feature-settings: "tnum"; margin-right: 6px; }
+.wm-focus-track { width: 46px; height: 4px; border-radius: 999px; background-color: rgba(255, 255, 255, 0.18); }
+.wm-focus-fill { height: 4px; border-radius: 999px; background-color: #ff6b6b; }
+.wm-focus.break .wm-focus-fill { background-color: #64d2ff; }
+
+/* ---------------------------------------------------------------- notificação espiando na ilha */
+.wm-peek { spacing: 6px; padding: 0 6px; max-width: 320px; }
+.wm-peek-text { font-weight: bold; max-width: 280px; }
+
+/* ---------------------------------------------------------------- paleta de comandos (Super+K) */
+.wm-palette-backdrop { background-color: rgba(0, 0, 0, 0.25); }
+.wm-palette {
+  background-color: rgba(30, 30, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  padding: 10px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+}
+.wm-palette-entry {
+  font-size: 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background-color: rgba(255, 255, 255, 0.07);
+  border: none;
+  color: #ffffff;
+  caret-color: #ffffff;
+  selection-background-color: rgba(255, 255, 255, 0.3);
+}
+.wm-palette-search-icon { icon-size: 18px; padding-right: 8px; color: rgba(255, 255, 255, 0.6); }
+.wm-palette-list { spacing: 2px; padding-top: 8px; }
+.wm-palette-row { border-radius: 12px; padding: 9px 12px; color: #ffffff; }
+.wm-palette-row:selected, .wm-palette-row:hover { background-color: rgba(255, 255, 255, 0.12); }
+.wm-palette-icon { icon-size: 18px; margin-right: 12px; color: rgba(255, 255, 255, 0.85); }
+.wm-palette-title { font-size: 14px; }
+.wm-palette-hint { font-size: 12px; color: rgba(255, 255, 255, 0.5); }

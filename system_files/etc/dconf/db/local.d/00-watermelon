@@ -63,7 +63,7 @@ show-desktop=['<Super>d']
 # Super+E = arquivos (Windows) · Ctrl+Shift+Esc = gerenciador de tarefas · Ctrl+Alt+T = terminal
 [org/gnome/settings-daemon/plugins/media-keys]
 home=['<Super>e']
-custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/flameshot/']
+custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/flameshot/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/kooha/']
 
 [org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/taskmgr]
 name='Gerenciador de tarefas'
@@ -75,10 +75,21 @@ name='Print com anotações (Flameshot)'
 command='flatpak run org.flameshot.Flameshot gui'
 binding='<Control>Print'
 
+# Super+Shift+R = gravar a tela (vídeo ou GIF)
+[org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/kooha]
+name='Gravar a tela (Kooha)'
+command='flatpak run io.github.seadve.Kooha'
+binding='<Shift><Super>r'
+
 [org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/terminal]
 name='Terminal'
 command='ghostty'
 binding='<Control><Alt>t'
+
+# Sons do sistema próprios (branding/sounds/generate.py)
+[org/gnome/desktop/sound]
+theme-name='watermelon'
+event-sounds=true
 
 # Night Shift: tela mais quente do pôr do sol ao nascer do sol
 [org/gnome/settings-daemon/plugins/color]

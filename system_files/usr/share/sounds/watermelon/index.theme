@@ -1,0 +1,8 @@
+[Sound Theme]
+Name=WatermelonOS
+Comment=Sons do sistema do WatermelonOS
+Inherits=freedesktop
+Directories=stereo
+
+[stereo]
+OutputProfile=stereo

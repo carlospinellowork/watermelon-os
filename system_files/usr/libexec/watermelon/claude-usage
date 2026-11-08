@@ -1,0 +1,74 @@
+#!/usr/bin/python3
+"""Resumo do uso do Claude Code a partir dos históricos locais (~/.claude/projects/*/*.jsonl).
+
+Imprime JSON para a ilha do Claude:
+  {"h5": {...}, "d7": {...}, "sessions": [...]}
+Os números são uma estimativa local (tokens das respostas); os limites do plano
+só o próprio Claude mostra, com /usage.
+"""
+import datetime as dt
+import glob
+import json
+import os
+import sys
+
+ROOT = os.path.expanduser("~/.claude/projects")
+now = dt.datetime.now(dt.timezone.utc)
+cut5h, cut7d = now - dt.timedelta(hours=5), now - dt.timedelta(days=7)
+
+
+def empty():
+    return {"messages": 0, "input": 0, "output": 0, "cache": 0, "projects": {}}
+
+
+h5, d7 = empty(), empty()
+sessions = []
+seen = set()
+
+for path in glob.glob(os.path.join(ROOT, "*", "*.jsonl")):
+    try:
+        mtime = dt.datetime.fromtimestamp(os.path.getmtime(path), dt.timezone.utc)
+    except OSError:
+        continue
+    if mtime < cut7d:
+        continue
+    cwd = None
+    with open(path, errors="ignore") as f:
+        for line in f:
+            if '"usage"' not in line:
+                if cwd is None and '"cwd"' in line:
+                    try:
+                        cwd = json.loads(line).get("cwd")
+                    except ValueError:
+                        pass
+                continue
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            cwd = cwd or d.get("cwd")   # a pasta onde a sessão começou (subpastas contam no mesmo projeto)
+            rid = d.get("requestId") or d.get("uuid")
+            if rid in seen:
+                continue
+            seen.add(rid)
+            u = (d.get("message") or {}).get("usage") or {}
+            try:
+                t = dt.datetime.fromisoformat(d["timestamp"].replace("Z", "+00:00"))
+            except (KeyError, ValueError):
+                continue
+            proj = os.path.basename(cwd or "?")
+            for bucket, cut in ((d7, cut7d), (h5, cut5h)):
+                if t >= cut:
+                    bucket["messages"] += 1
+                    bucket["input"] += u.get("input_tokens", 0)
+                    bucket["output"] += u.get("output_tokens", 0)
+                    bucket["cache"] += u.get("cache_creation_input_tokens", 0) + u.get("cache_read_input_tokens", 0)
+                    bucket["projects"][proj] = bucket["projects"].get(proj, 0) + 1
+    age = (now - mtime).total_seconds()
+    if age < 3600:
+        sessions.append({"project": os.path.basename(cwd or "?"), "cwd": cwd, "minutes": int(age // 60)})
+
+for b in (h5, d7):
+    b["projects"] = sorted(b["projects"].items(), key=lambda kv: -kv[1])[:4]
+sessions.sort(key=lambda s: s["minutes"])
+json.dump({"h5": h5, "d7": d7, "sessions": sessions}, sys.stdout)

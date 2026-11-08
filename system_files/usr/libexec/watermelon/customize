@@ -275,6 +275,13 @@ def extension_dir(uuid):
     return None
 
 
+def _libexec(name):
+    """Programa auxiliar do sistema, ou o do repositório quando o app roda direto dele."""
+    system = f"/usr/libexec/watermelon/{name}"
+    repo = os.path.join(os.path.dirname(os.path.realpath(__file__)), name)
+    return system if os.path.exists(system) or not os.path.exists(repo) else repo
+
+
 def ext_settings(uuid, schema_id):
     """Configurações de uma extensão (o schema fica dentro da pasta dela)."""
     d = extension_dir(uuid)
@@ -598,11 +605,21 @@ class BarPage(Adw.PreferencesPage):
                     ("island", "Ilha dinâmica", "A música tocando aparece junto do relógio, com controles"),
                     ("melon-menu", "Menu 🍉", "Atalhos do sistema no canto esquerdo da barra"),
                     ("github-status", "Status do GitHub Actions", "Bolinha verde, amarela ou vermelha com seus builds"),
-                    ("widgets", "Widgets na área de trabalho", "Relógio, uso do sistema e música")):
+                    ("widgets", "Widgets na área de trabalho", "Relógio, uso do sistema e música"),
+                    ("git-island", "Ilha do Git", "Branch e mudanças do projeto em que você está no terminal"),
+                    ("claude-island", "Ilha do Claude", "Mostra quando o Claude Code está trabalhando, precisa de você ou terminou"),
+                    ("ports", "Portas abertas", "Seus servidores de desenvolvimento rodando, com abrir e encerrar"),
+                    ("island-notifications", "Notificações na ilha", "A notificação aparece rapidinho na ilha do relógio"),
+                    ("palette", "Paleta de comandos (Super+K)", "Digite o que quer fazer: tema, foco, portas, repositórios, contas…"),
+                    ("focus", "Modo foco (Pomodoro)", "Contagem regressiva na barra e notificações em silêncio")):
                 row = Adw.SwitchRow(title=title, subtitle=sub)
                 ws.bind(key, row, "active", Gio.SettingsBindFlags.DEFAULT)
                 row.connect("notify::active", lambda r, _p: r.get_active() and not extension_enabled(SHELL_UUID)
                             and set_extension(SHELL_UUID, True))
+                if key == "claude-island":
+                    # a ilha precisa dos hooks do Claude Code: liga/desliga junto, por escolha sua
+                    row.connect("notify::active", lambda r, _p: subprocess.Popen(
+                        [_libexec("claude-island-setup")] + ([] if r.get_active() else ["--tirar"])))
                 x.add(row)
             repos = Adw.EntryRow(title="Repositórios do GitHub (dono/nome, separados por vírgula; vazio = automático)",
                                  show_apply_button=True)

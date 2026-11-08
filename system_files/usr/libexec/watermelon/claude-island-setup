@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# melon claude-ilha — liga a ilha do Claude na barra.
+# Adiciona ao ~/.claude/settings.json hooks que avisam a barra quando o Claude Code
+# começa a trabalhar, precisa de você, termina ou fecha a sessão. Mantém o resto do arquivo,
+# faz backup e pode rodar quantas vezes quiser (não duplica).
+#   melon claude-ilha          liga
+#   melon claude-ilha --tirar  desliga (remove só os hooks do WatermelonOS)
+set -euo pipefail
+
+SETTINGS="$HOME/.claude/settings.json"
+MARK="watermelon/claude-hook"
+GRN=$'\e[38;2;125;211;160m' DIM=$'\e[2m' OFF=$'\e[0m'
+
+mkdir -p "$(dirname "$SETTINGS")"
+[[ -s $SETTINGS ]] || echo '{}' > "$SETTINGS"
+jq -e . "$SETTINGS" >/dev/null || { echo "~/.claude/settings.json não é um JSON válido; corrija antes." >&2; exit 1; }
+cp "$SETTINGS" "$SETTINGS.bak-watermelon"
+
+# remove hooks antigos do WatermelonOS (deixa os seus intactos)
+strip='.hooks |= ((. // {}) | with_entries(.value |= map(select(([.hooks[]?.command] | any(contains("'"$MARK"'"))) | not)))
+                            | with_entries(select(.value | length > 0)))
+       | if .hooks == {} then del(.hooks) else . end'
+
+if [[ ${1:-} == --tirar ]]; then
+  jq "$strip" "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
+  echo "${GRN}✔${OFF} Ilha do Claude desligada (hooks removidos)."
+  exit 0
+fi
+
+cmd() {  # usa o script do sistema; durante o desenvolvimento, o do repositório
+  printf 'H=/usr/libexec/%s; [ -x "$H" ] || H="$HOME/Documentos/watermelon-os/system_files/usr/libexec/%s"; "$H" %s 2>/dev/null || true' \
+    "$MARK" "$MARK" "$1"
+}
+add='.hooks //= {}'
+for ev in UserPromptSubmit Notification Stop SessionEnd; do
+  add+=" | .hooks.$ev = ((.hooks.$ev // []) + [{\"hooks\": [{\"type\": \"command\", \"async\": true, \"command\": \$c$ev}]}])"
+done
+jq "$strip" "$SETTINGS" | jq \
+  --arg cUserPromptSubmit "$(cmd UserPromptSubmit)" --arg cNotification "$(cmd Notification)" \
+  --arg cStop "$(cmd Stop)" --arg cSessionEnd "$(cmd SessionEnd)" "$add" > "$SETTINGS.tmp"
+mv "$SETTINGS.tmp" "$SETTINGS"
+echo "${GRN}✔${OFF} Ilha do Claude ligada. Vale para as próximas sessões do Claude Code."
+echo "  ${DIM}backup: ~/.claude/settings.json.bak-watermelon · desligar: melon claude-ilha --tirar${OFF}"

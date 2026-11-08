@@ -18,6 +18,8 @@ ${B}Uso:${OFF}
   melon seguranca      Confere a segurança do sistema e dá uma nota
   melon doctor         Checa a saúde do sistema e das ferramentas (--corrigir)
   melon env            Cofre de variáveis dos projetos (dev/prod)
+  melon foco [min]     Modo foco com Pomodoro na barra (melon foco parar)
+  melon claude-ilha    Liga a ilha do Claude na barra (--tirar desliga)
   melon status         Versão do sistema e atualizações pendentes
   melon version        Versão do melon e do sistema
 
@@ -39,6 +41,21 @@ case "${1:-help}" in
     shift; exec "$LIB/security" "$@" ;;
   doctor|medico|médico)
     shift; exec "$LIB/doctor" "$@" ;;
+  foco|focus|pomodoro)
+    ext=watermelon-shell@watermelon.os
+    for d in "$HOME/.local/share/gnome-shell/extensions/$ext/schemas" "/usr/share/gnome-shell/extensions/$ext/schemas"; do
+      [[ -f $d/gschemas.compiled ]] && { SCHEMADIR=$d; break; }
+    done
+    [[ -n ${SCHEMADIR:-} ]] || { echo "extensão watermelon-shell não encontrada" >&2; exit 1; }
+    case "${2:-}" in
+      parar|stop|off) gsettings --schemadir "$SCHEMADIR" set org.gnome.shell.extensions.watermelon-shell focus-active false
+                      echo "${GRN}Foco encerrado.${OFF}" ;;
+      *)  [[ ${2:-} =~ ^[0-9]+$ ]] && gsettings --schemadir "$SCHEMADIR" set org.gnome.shell.extensions.watermelon-shell focus-minutes "$2"
+          gsettings --schemadir "$SCHEMADIR" set org.gnome.shell.extensions.watermelon-shell focus-active true
+          echo "${RED}🍅 Foco ligado${OFF} por $(gsettings --schemadir "$SCHEMADIR" get org.gnome.shell.extensions.watermelon-shell focus-minutes) min. Notificações em silêncio até o fim." ;;
+    esac ;;
+  claude-ilha|claude-island)
+    shift; exec "$LIB/claude-island-setup" "$@" ;;
   env|cofre|vault)
     shift; exec "$LIB/vault" "$@" ;;
   personalizar|customize)
