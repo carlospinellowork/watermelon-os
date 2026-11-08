@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WatermelonOS — o sistema feito para quem desenvolve</title>
+<meta name="description" content="Sistema operacional para desenvolvedores: Docker, VS Code, Git, Claude Code e terminal turbinado prontos em minutos. Atualizações automáticas que nunca quebram.">
+<meta property="og:title" content="WatermelonOS">
+<meta property="og:description" content="O sistema operacional feito para quem desenvolve.">
+<meta property="og:image" content="img/hero.png">
+<link rel="icon" href="img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --melon: #e8304a;
+  --melon-soft: #ff5468;
+  --rind: #1e7a3c;
+  --rind-light: #a8e6a1;
+  --bg: #fbfaf7;
+  --surface: #ffffff;
+  --surface-2: #f3f1ec;
+  --ink: #1d1d1f;
+  --ink-soft: #5e5e64;
+  --line: #e6e3dc;
+  --term-bg: #121614;
+  --term-ink: #e8e6e3;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 12px 32px rgba(36,29,74,.10);
+  --radius: 18px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1012;
+    --surface: #16191c;
+    --surface-2: #1d2125;
+    --ink: #f2f1ee;
+    --ink-soft: #a5a5ab;
+    --line: #2a2e33;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1012; --surface: #16191c; --surface-2: #1d2125; --ink: #f2f1ee;
+  --ink-soft: #a5a5ab; --line: #2a2e33; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+code, kbd, pre { font-family: "JetBrains Mono", ui-monospace, monospace; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+@media (max-width: 600px) { .wrap { padding: 0 16px; } }
+
+/* ------------------------------------------------ navegação */
+nav {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.3px; text-decoration: none; font-size: 18px; }
+.brand img { width: 28px; height: 28px; }
+.brand b { color: var(--melon); }
+nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 14px; }
+nav .links a { text-decoration: none; color: var(--ink-soft); font-weight: 500; }
+nav .links a:hover { color: var(--ink); }
+@media (max-width: 760px) { nav .links a:not(.cta-mini) { display: none; } }
+.cta-mini { background: var(--melon); color: #fff !important; padding: 6px 14px; border-radius: 999px; }
+
+/* ------------------------------------------------ topo */
+.hero {
+  position: relative; overflow: hidden; color: #fff;
+  background: #241d4a url(img/hero.png) center 62% / cover no-repeat;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero { background-image: url(img/hero-night.png); } }
+:root[data-theme="dark"] .hero { background-image: url(img/hero-night.png); }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,14,40,.55) 0%, rgba(20,14,40,.15) 45%, rgba(14,16,18,.65) 100%); }
+.hero .wrap { position: relative; z-index: 1; padding-top: 110px; padding-bottom: 130px; text-align: center; }
+.hero img.logo { width: 112px; height: 112px; margin: 0 auto 18px; filter: drop-shadow(0 12px 28px rgba(0,0,0,.35)); }
+.hero h1 { font-size: clamp(40px, 7vw, 76px); line-height: 1.02; margin: 0 0 14px; letter-spacing: -2px; font-weight: 800; }
+.hero h1 span { color: var(--melon-soft); }
+.hero p.lead { font-size: clamp(17px, 2.2vw, 21px); max-width: 640px; margin: 0 auto 30px; color: rgba(255,255,255,.88); }
+.buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 24px; border-radius: 999px; font-weight: 700; text-decoration: none; font-size: 15px; transition: transform .15s; }
+.btn:hover { transform: translateY(-1px); }
+.btn.primary { background: var(--melon); color: #fff; box-shadow: 0 10px 26px rgba(232,48,74,.4); }
+.btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.3); backdrop-filter: blur(8px); }
+.badges { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 34px; font-size: 13px; }
+.badges span { background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.18); padding: 5px 12px; border-radius: 999px; backdrop-filter: blur(6px); }
+
+/* ------------------------------------------------ seções */
+section { padding: 96px 0; }
+section.alt { background: var(--surface-2); }
+.eyebrow { color: var(--melon); font-weight: 700; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; margin: 0 0 10px; }
+h2 { font-size: clamp(30px, 4.4vw, 46px); line-height: 1.1; letter-spacing: -1.2px; margin: 0 0 14px; font-weight: 800; }
+.section-lead { color: var(--ink-soft); font-size: 18px; max-width: 680px; margin: 0 0 48px; }
+
+/* recursos */
+.grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+.card .ico { font-size: 28px; line-height: 1; margin-bottom: 14px; }
+.card h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.3px; }
+.card p { margin: 0; color: var(--ink-soft); font-size: 15px; }
+.card code { font-size: 13px; background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
+
+/* prints */
+.shots { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.shot { margin: 0; }
+.shot img { border-radius: 14px; border: 1px solid var(--line); box-shadow: var(--shadow); aspect-ratio: 16/10; object-fit: cover; width: 100%; }
+.shot figcaption { margin-top: 10px; font-size: 14px; color: var(--ink-soft); }
+.shot figcaption b { color: var(--ink); }
+
+/* terminal */
+.term-wrap { display: grid; gap: 40px; grid-template-columns: 1fr 1.15fr; align-items: center; }
+@media (max-width: 880px) { .term-wrap { grid-template-columns: 1fr; } }
+.term { background: var(--term-bg); color: var(--term-ink); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; font-size: 13.5px; }
+.term .bar { display: flex; gap: 7px; padding: 12px 14px; background: #1a201d; }
+.term .bar i { width: 12px; height: 12px; border-radius: 50%; background: #3a403d; }
+.term .bar i:nth-child(1) { background: #ff5f57; } .term .bar i:nth-child(2) { background: #febc2e; } .term .bar i:nth-child(3) { background: #28c840; }
+.term pre { margin: 0; padding: 18px 20px 22px; white-space: pre-wrap; word-break: break-word; line-height: 1.7; }
+.t-dir { color: #7dd3a0; font-weight: 600; } .t-git { color: #ff5468; font-weight: 600; } .t-ok { color: #7dd3a0; }
+.t-cmd { color: #fff; } .t-dim { color: #6e756f; } .t-melon { color: #ff5468; } .t-sug { color: #5d655f; }
+.checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.checklist li { padding-left: 34px; position: relative; color: var(--ink-soft); }
+.checklist li b { color: var(--ink); }
+.checklist li::before { content: "🍉"; position: absolute; left: 0; top: 0; }
+
+/* atalhos */
+.keys { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.keys th, .keys td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.keys tr:last-child td { border-bottom: 0; }
+.keys th { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-soft); background: var(--surface-2); }
+.keys td:first-child { white-space: nowrap; }
+.keys td:last-child { color: var(--ink-soft); font-size: 14px; }
+kbd { display: inline-block; min-width: 26px; text-align: center; padding: 3px 8px; font-size: 12.5px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 7px; margin: 0 1px; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .keys thead { display: none; }
+  .keys tr { display: block; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .keys td { display: block; padding: 3px 0; border: 0; }
+}
+
+/* instalar */
+.install { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.install .card { display: flex; flex-direction: column; }
+.install .card.featured { border: 2px solid var(--melon); }
+.install .card .rec { align-self: flex-start; background: var(--melon); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; margin-bottom: 12px; }
+.install ol { margin: 12px 0 0; padding-left: 20px; color: var(--ink-soft); font-size: 15px; }
+.install ol li { margin-bottom: 6px; }
+.copy { position: relative; margin-top: 14px; }
+.copy pre { margin: 0; background: var(--term-bg); color: var(--term-ink); padding: 14px 16px; padding-right: 74px; border-radius: 12px; font-size: 12.5px; white-space: pre-wrap; word-break: break-all; }
+.copy button { position: absolute; top: 9px; right: 9px; background: #2a302d; color: #fff; border: 0; border-radius: 8px; padding: 5px 10px; font: 600 12px Inter, sans-serif; cursor: pointer; }
+.install .btn { margin-top: auto; align-self: flex-start; }
+.install .card .btn { margin-top: 18px; }
+
+/* rodapé */
+footer { border-top: 1px solid var(--line); padding: 40px 0 56px; color: var(--ink-soft); font-size: 14px; }
+footer .wrap { display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="img/logo.svg" alt=""><span><b>watermelon</b>OS</span></a>
+    <div class="links">
+      <a href="#recursos">Recursos</a>
+      <a href="#telas">Telas</a>
+      <a href="#atalhos">Atalhos</a>
+      <a href="#terminal">Terminal</a>
+      <a href="https://github.com/carlospinellowork/watermelon-os">GitHub</a>
+      <a class="cta-mini" href="#instalar">Instalar</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <img class="logo" src="img/logo.svg" alt="Logo do WatermelonOS: fatia de melancia mordida">
+    <h1><span>watermelon</span>OS</h1>
+    <p class="lead">O sistema operacional feito para quem desenvolve. Instale, entre no GitHub e no Claude, e em minutos seu computador está pronto para programar.</p>
+    <div class="buttons">
+      <a class="btn primary" href="#instalar">🍉 Instalar grátis</a>
+      <a class="btn ghost" href="https://github.com/carlospinellowork/watermelon-os">Ver no GitHub</a>
+    </div>
+    <div class="badges">
+      <span>Código aberto</span><span>Atualizações automáticas</span><span>Instala sem pendrive</span><span>Em português</span>
+    </div>
+  </div>
+</header>
+
+<section id="recursos">
+  <div class="wrap">
+    <p class="eyebrow">Recursos</p>
+    <h2>Pronto para programar no primeiro boot</h2>
+    <p class="section-lead">Chega de passar dois dias montando o ambiente depois de formatar. Tudo que um dev usa já vem instalado e configurado, e o que é específico do seu trabalho entra com um clique.</p>
+    <div class="grid">
+      <div class="card"><div class="ico">👋</div><h3>Assistente de boas-vindas</h3><p>Wi-Fi, aparência, navegador, perfis de dev, GitHub e Claude. Poucos cliques e está tudo pronto.</p></div>
+      <div class="card"><div class="ico">🔑</div><h3>GitHub em 1 minuto</h3><p><code>melon setup git</code> faz login, cria a chave SSH, envia para o GitHub e assina seus commits.</p></div>
+      <div class="card"><div class="ico">🤖</div><h3>Claude Code nativo</h3><p>Seu par de programação com IA já instalado. Login direto no assistente de boas-vindas.</p></div>
+      <div class="card"><div class="ico">🧰</div><h3>Perfis de desenvolvimento</h3><p><b>Fullstack</b>, <b>Mobile</b> e <b>Data/IA</b>: Node, Bun, Python, Go, Java, Flutter, Android Studio, Jupyter, Ollama…</p></div>
+      <div class="card"><div class="ico">🐳</div><h3>Docker e VS Code</h3><p>Docker sem <code>sudo</code>, Dev Containers e VS Code com fontes e terminal já configurados.</p></div>
+      <div class="card"><div class="ico">📦</div><h3>Instala qualquer coisa</h3><p><code>melon install</code> abre <code>.exe</code>, <code>.apk</code>, <code>.deb</code>, <code>.rpm</code> e AppImage. Ou dois cliques no arquivo.</p></div>
+      <div class="card"><div class="ico">🛡️</div><h3>Nunca quebra</h3><p>Atualizações automáticas e atômicas, aplicadas no próximo boot. A versão anterior fica sempre disponível no menu.</p></div>
+      <div class="card"><div class="ico">⚡</div><h3>Leve e rápido</h3><p>Nada roda à toa: Docker, Android e Windows só ligam quando você usa. Sem limite de <i>file watchers</i> para Vite e Webpack.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="telas" class="alt">
+  <div class="wrap">
+    <p class="eyebrow">Telas</p>
+    <h2>Bonito por padrão</h2>
+    <p class="section-lead">Visual limpo com dock, wallpaper original <i>Golden Hour</i> que muda do pôr do sol para a noite junto com o tema escuro, e a melancia em cada detalhe.</p>
+    <div class="shots">
+      <figure class="shot"><img src="img/boas-vindas.png" alt="Assistente Bem-vindo ao WatermelonOS" loading="lazy"><figcaption><b>Boas-vindas.</b> O assistente abre sozinho no primeiro login.</figcaption></figure>
+      <figure class="shot"><img src="img/perfis.png" alt="Escolha de perfis Fullstack, Mobile e Data/IA" loading="lazy"><figcaption><b>Perfis.</b> Escolha o que você desenvolve; a instalação roda em segundo plano.</figcaption></figure>
+      <figure class="shot"><img src="img/aparencia.png" alt="Escolha de tema claro ou escuro" loading="lazy"><figcaption><b>Aparência.</b> Claro de dia, escuro de noite.</figcaption></figure>
+      <figure class="shot"><img src="img/navegador.png" alt="Escolha de navegador" loading="lazy"><figcaption><b>Navegador.</b> Chrome, Brave, Opera ou Firefox.</figcaption></figure>
+      <figure class="shot"><img src="img/instalando.png" alt="Instalação das ferramentas com progresso no terminal" loading="lazy"><figcaption><b>Instalação ao vivo.</b> Você acompanha cada ferramenta entrando.</figcaption></figure>
+      <figure class="shot"><img src="img/login.png" alt="Tela de login do WatermelonOS" loading="lazy"><figcaption><b>Login.</b> A marca do sistema em cada detalhe.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="atalhos">
+  <div class="wrap">
+    <p class="eyebrow">Atalhos</p>
+    <h2>O melhor do Mac, do Windows e do Linux</h2>
+    <p class="section-lead">Os atalhos que você já conhece de outros sistemas funcionam aqui, e alguns que nenhum outro sistema tem.</p>
+    <table class="keys">
+      <thead><tr><th>Atalho</th><th>O que faz</th><th>Inspirado em</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>Super</kbd> <kbd>Espaço</kbd></td><td>Busca: apps, arquivos, calculadora e configurações</td><td><span class="tag">🍎 Spotlight</span></td></tr>
+        <tr><td><kbd>Espaço</kbd> num arquivo</td><td>Pré-visualiza sem abrir (imagens, PDFs, vídeos, código)</td><td><span class="tag">🍎 Quick Look</span></td></tr>
+        <tr><td><kbd>Super</kbd> <kbd>V</kbd></td><td>Histórico da área de transferência (últimos 100 itens)</td><td><span class="tag">🪟 Windows</span></td></tr>
+        <tr><td><kbd>Super</kbd> <kbd>.</kbd></td><td>Seletor de emoji</td><td><span class="tag">🪟 Windows</span></td></tr>
+        <tr><td><kbd>Super</kbd> <kbd>←</kbd> <kbd>→</kbd></td><td>Encaixa janelas lado a lado, com layouts em grade</td><td><span class="tag">🪟 Snap Layouts</span></td></tr>
+        <tr><td><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Esc</kbd></td><td>Gerenciador de tarefas</td><td><span class="tag">🪟 Windows</span></td></tr>
+        <tr><td><kbd>Super</kbd> <kbd>E</kbd></td><td>Abre os arquivos</td><td><span class="tag">🪟 Windows</span></td></tr>
+        <tr><td><kbd>Super</kbd> <kbd>D</kbd></td><td>Mostra a área de trabalho</td><td><span class="tag">🪟 Windows</span></td></tr>
+        <tr><td><kbd>Shift</kbd> <kbd>Super</kbd> <kbd>S</kbd></td><td>Print de uma área da tela (também <kbd>Print</kbd>)</td><td><span class="tag">🪟 Ferramenta de Captura</span></td></tr>
+        <tr><td><kbd>Ctrl</kbd> <kbd>Print</kbd></td><td>Print com setas, textos e destaques (Flameshot)</td><td><span class="tag">🐧 Linux</span></td></tr>
+        <tr><td><kbd>F12</kbd></td><td>Terminal suspenso que desce do topo da tela</td><td><span class="tag">🐧 Quake</span></td></tr>
+        <tr><td><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>T</kbd></td><td>Abre o terminal</td><td><span class="tag">🐧 Linux</span></td></tr>
+        <tr><td><kbd>Super</kbd> <kbd>Q</kbd></td><td>Fecha a janela</td><td><span class="tag">🍎 Mac</span></td></tr>
+        <tr><td><kbd>Alt</kbd> <kbd>Tab</kbd></td><td>Alterna entre janelas (<kbd>Super</kbd> <kbd>Tab</kbd> entre apps)</td><td><span class="tag">🪟 🍎</span></td></tr>
+        <tr><td><kbd>Super</kbd> <kbd>N</kbd></td><td>Central de notificações e calendário</td><td><span class="tag">🍎 Mac</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="grid" style="margin-top:28px">
+      <div class="card"><div class="ico">🔔</div><h3>Aviso de comando longo</h3><p>Rodou um build de 3 minutos e foi para outra janela? Chega uma notificação ✅ ou ❌ quando ele terminar.</p></div>
+      <div class="card"><div class="ico">📱</div><h3>Celular integrado</h3><p>Envie arquivos, veja notificações e compartilhe a área de transferência com o Android, como o AirDrop.</p></div>
+      <div class="card"><div class="ico">🌙</div><h3>Night Shift</h3><p>A tela fica mais quente do pôr ao nascer do sol. Seus olhos agradecem no deploy da madrugada.</p></div>
+      <div class="card"><div class="ico">☕</div><h3>Manter acordado</h3><p>Um clique na barra impede a tela de apagar durante apresentações e builds longos.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="terminal" class="alt">
+  <div class="wrap term-wrap">
+    <div>
+      <p class="eyebrow">Terminal</p>
+      <h2>Um terminal que trabalha com você</h2>
+      <p class="section-lead" style="margin-bottom:28px">Ghostty com aceleração de vídeo, zsh configurado e as ferramentas que os devs mais gostam, sem precisar montar nada.</p>
+      <ul class="checklist">
+        <li><b>Sugestões enquanto digita</b>, a partir do seu histórico. <kbd>→</kbd> aceita.</li>
+        <li><b><kbd>Tab</kbd> com busca e prévia</b> de arquivos, pastas e branches.</li>
+        <li><b><kbd>Ctrl</kbd> <kbd>R</kbd></b> abre seu histórico em tela cheia, filtrável por pasta.</li>
+        <li><b>Prompt com git</b>: branch, alterações, versão do Node/Python e tempo do comando.</li>
+        <li><b>lazygit, lazydocker, yazi, delta, fzf, ripgrep, zoxide, btop</b> e mais.</li>
+        <li><b><code>z projeto</code></b> pula para qualquer pasta que você já visitou.</li>
+      </ul>
+    </div>
+    <div class="term" role="img" aria-label="Exemplo do terminal do WatermelonOS">
+      <div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="t-dir">~/projetos/loja</span> <span class="t-git"> main</span> <span class="t-dim">[!2]</span>  <span class="t-dim">v22.11.0</span>
+<span class="t-ok">❯</span> <span class="t-cmd">melon setup git</span>
+<span class="t-melon">🍉 Conectando ao GitHub</span>
+   <span class="t-ok">✔</span> conectado como @carlospinellowork
+<span class="t-melon">🍉 Chave SSH</span>
+   <span class="t-ok">✔</span> chave ed25519 criada
+   <span class="t-ok">✔</span> enviada ao GitHub (acesso + assinatura)
+   <span class="t-ok">✔</span> commits e tags assinados automaticamente
+<span class="t-melon">🍉 Pronto!</span>
+
+<span class="t-dir">~/projetos/loja</span> <span class="t-git"> main</span>
+<span class="t-ok">❯</span> <span class="t-cmd">melon install</span> <span class="t-sug">~/Downloads/app.exe</span>
+<span class="t-melon">🍉 Programa do Windows: app.exe</span>
+   <span class="t-ok">✔</span> pronto: abra pelo menu de aplicativos
+
+<span class="t-dir">~/projetos/loja</span> <span class="t-git"> main</span>
+<span class="t-ok">❯</span> <span class="t-cmd">docker compose up</span><span class="t-sug"> -d</span></pre>
+    </div>
+  </div>
+</section>
+
+<section id="instalar">
+  <div class="wrap">
+    <p class="eyebrow">Instalar</p>
+    <h2>Três jeitos de instalar, dois sem pendrive</h2>
+    <p class="section-lead">Escolha o que combina com o seu computador. Em todos eles, no primeiro boot você cria seu usuário e o assistente de boas-vindas cuida do resto.</p>
+    <div class="install">
+      <div class="card featured">
+        <span class="rec">Sem pendrive · Dual boot</span>
+        <h3>🪟 Pelo Windows</h3>
+        <p>Para PCs com <b>dois discos</b>: instala o WatermelonOS no segundo disco e você escolhe o sistema ao ligar. O disco do Windows não é tocado.</p>
+        <ol>
+          <li>Baixe e abra o instalador.</li>
+          <li>Escolha o disco livre (o do Windows fica bloqueado).</li>
+          <li>Reinicie: menu com WatermelonOS e Windows.</li>
+        </ol>
+        <a class="btn primary" href="https://github.com/carlospinellowork/watermelon-os/releases/latest">Baixar instalador</a>
+      </div>
+      <div class="card">
+        <span class="rec" style="background:var(--rind)">Sem pendrive</span>
+        <h3>🐧 Pelo Linux que você já usa</h3>
+        <p>Ubuntu, Mint, Debian, Fedora… Um comando instala o WatermelonOS no lugar, e seus arquivos vêm junto.</p>
+        <div class="copy"><pre id="cmd-linux">curl -fsSL https://raw.githubusercontent.com/carlospinellowork/watermelon-os/main/install/from-linux.sh | bash</pre><button type="button" data-copy="cmd-linux">Copiar</button></div>
+      </div>
+      <div class="card">
+        <span class="rec" style="background:#5e5e64">Clássico</span>
+        <h3>💾 Com pendrive</h3>
+        <p>Baixe a ISO, grave num pendrive com o Balena Etcher ou o Rufus e dê boot por ele.</p>
+        <a class="btn" style="background:var(--surface-2);border:1px solid var(--line)" href="https://github.com/carlospinellowork/watermelon-os/releases/latest">Baixar ISO</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <p class="eyebrow">Por dentro</p>
+    <h2>Feito para não te deixar na mão</h2>
+    <div class="grid" style="margin-top:36px">
+      <div class="card"><div class="ico">🔄</div><h3>Atualiza sozinho</h3><p>Baixa em segundo plano e aplica no próximo boot. Nunca reinicia sem você mandar.</p></div>
+      <div class="card"><div class="ico">⏪</div><h3>Volta no tempo</h3><p>Uma atualização deu problema? Escolha a versão anterior no menu de boot e pronto.</p></div>
+      <div class="card"><div class="ico">🔒</div><h3>Seguro</h3><p>Sistema base somente leitura, Secure Boot e builds diários com as correções de segurança.</p></div>
+      <div class="card"><div class="ico">💚</div><h3>Código aberto</h3><p>Licença MIT. O sistema inteiro é definido num único arquivo, construído às claras no GitHub.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="img/logo.svg" alt=""><span><b>watermelon</b>OS</span></a>
+    <span>Feito com 🍉 no Brasil · <a href="https://github.com/carlospinellowork/watermelon-os">GitHub</a> · Licença MIT</span>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll("[data-copy]").forEach(function (b) {
+  b.addEventListener("click", function () {
+    var text = document.getElementById(b.dataset.copy).textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      b.textContent = "Copiado!";
+      setTimeout(function () { b.textContent = "Copiar"; }, 1600);
+    });
+  });
+});
+</script>
+</body>
+</html>

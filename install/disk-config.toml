@@ -1,0 +1,5 @@
+# Imagem "disco pronto" (instalador do Windows): sem usuário; a pessoa cria no primeiro boot.
+# O sistema começa com 18 GiB e se expande sozinho para o disco inteiro no primeiro boot.
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "18 GiB"

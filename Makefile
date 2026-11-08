@@ -24,7 +24,7 @@ QEMU_BASE = qemu-system-x86_64 -enable-kvm -cpu host -smp $(VM_CPUS) -m $(VM_MEM
 	  -device qemu-xhci -device usb-tablet \
 	  -monitor unix:$(VM_DIR)/monitor.sock,server,nowait
 
-.PHONY: build build-test qcow2 iso vm vm-headless vm-ssh vm-shot clean
+.PHONY: build build-test qcow2 iso raw vm vm-headless vm-ssh vm-shot clean
 
 build:
 	sudo podman build --build-arg FEDORA_VERSION=$(FEDORA_VERSION) -t $(IMAGE):$(TAG) .
@@ -56,6 +56,17 @@ qcow2: $(VM_DIR)/config.toml
 
 iso:
 	$(call bib,anaconda-iso,disk-config.toml,$(IMAGE):$(TAG))
+
+# Disco pronto para o instalador do Windows: grava direto no segundo disco.
+# Gera output/release/watermelon-os-disk.raw.gz.partNN (< 2 GB cada, limite do GitHub Releases)
+raw:
+	rm -rf output/image output/release
+	$(call bib,raw,install/disk-config.toml,$(IMAGE):$(TAG))
+	mkdir -p output/release
+	stat -c %s output/image/disk.raw > output/release/watermelon-os-disk.size
+	gzip -c -6 output/image/disk.raw | split -b 1900M -d -a 2 - output/release/watermelon-os-disk.raw.gz.part
+	cd output/release && sha256sum watermelon-os-disk.raw.gz.part* > SHA256SUMS
+	ls -lh output/release
 
 vm:
 	$(QEMU_BASE) -device virtio-vga-gl -display gtk,gl=on,show-cursor=on
