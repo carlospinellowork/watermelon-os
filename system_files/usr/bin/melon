@@ -20,6 +20,15 @@ ${B}Uso:${OFF}
   melon env            Cofre de variáveis dos projetos (dev/prod)
   melon foco [min]     Modo foco com Pomodoro na barra (melon foco parar)
   melon claude-ilha    Liga a ilha do Claude na barra (--tirar desliga)
+
+${B}Git com IA:${OFF}
+  melon commit         O Claude escreve a mensagem do commit a partir do diff
+  melon pr             Branch + push + PR com título e descrição do Claude
+  melon revisar        Revisão do Claude antes de enviar (bugs, segurança)
+  melon conflitos      Abre o Claude para resolver conflitos de merge
+  melon tarefa "…"     Tarefa em paralelo: worktree + branch + Claude (lista, limpar)
+  melon standup        Resumo do que você fez, pronto para a daily
+  melon pergunta "…"   Pergunta rápida ao Claude (--explicar: o que está copiado)
   melon status         Versão do sistema e atualizações pendentes
   melon version        Versão do melon e do sistema
 
@@ -54,6 +63,8 @@ case "${1:-help}" in
           gsettings --schemadir "$SCHEMADIR" set org.gnome.shell.extensions.watermelon-shell focus-active true
           echo "${RED}🍅 Foco ligado${OFF} por $(gsettings --schemadir "$SCHEMADIR" get org.gnome.shell.extensions.watermelon-shell focus-minutes) min. Notificações em silêncio até o fim." ;;
     esac ;;
+  commit|pr|revisar|review|conflitos|tarefa|task|standup|daily|pergunta|ask|"?")
+    exec "$LIB/git-ai" "$@" ;;
   claude-ilha|claude-island)
     shift; exec "$LIB/claude-island-setup" "$@" ;;
   env|cofre|vault)

@@ -121,6 +121,10 @@ _melon_vault() {
   [[ -x $bin && -f $idx ]] || return
   local d=$PWD root=$PWD
   while [[ $d != / ]]; do [[ -e $d/.git ]] && { root=$d; break }; d=${d:h}; done
+  if [[ -f $root/.git ]]; then   # worktree (melon tarefa): usa o cofre do repositório principal
+    local gd=${$(<$root/.git)#gitdir: }
+    [[ $gd == */.git/worktrees/* ]] && root=${gd%/.git/worktrees/*}
+  fi
   local sig=0
   if [[ -n ${(M)${(f)"$(<$idx)"}:#$root} ]]; then
     sig="$root:$(zstat +mtime $stamp 2>/dev/null)"

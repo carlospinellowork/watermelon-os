@@ -50,7 +50,18 @@ def project_root(start=None):
     d = os.path.realpath(start or os.getcwd())
     cur = d
     while True:
-        if os.path.exists(os.path.join(cur, ".git")):
+        git = os.path.join(cur, ".git")
+        if os.path.isfile(git):
+            # worktree (melon tarefa): usa as variáveis do repositório principal
+            try:
+                with open(git) as fh:
+                    gitdir = fh.read().split("gitdir:", 1)[1].strip()
+                if "/.git/worktrees/" in gitdir:
+                    return gitdir.split("/.git/worktrees/", 1)[0]
+            except (OSError, IndexError):
+                pass
+            return cur
+        if os.path.exists(git):
             return cur
         parent = os.path.dirname(cur)
         if parent == cur:

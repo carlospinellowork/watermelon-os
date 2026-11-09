@@ -16,6 +16,7 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
@@ -38,6 +39,20 @@ function human(n) {
 function ago(ts) {
     const m = Math.round((Date.now() / 1000 - ts) / 60);
     return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : `há ${Math.round(m / 60)} h`;
+}
+
+// Traz para a frente a janela do terminal da sessão: prefere a que tem o nome do projeto no título,
+// senão o terminal usado mais recentemente; sem terminal aberto, abre um na pasta.
+export function focusTerminal(cwd) {
+    const project = cwd ? GLib.path_get_basename(cwd).toLowerCase() : '';
+    const wins = global.display.list_all_windows()
+        .filter(w => /ghostty/i.test(w.get_wm_class() ?? ''))
+        .sort((a, b) => b.get_user_time() - a.get_user_time());
+    const win = wins.find(w => project && (w.get_title() ?? '').toLowerCase().includes(project)) ?? wins[0];
+    if (win)
+        Main.activateWindow(win);
+    else if (cwd)
+        terminalIn(cwd);
 }
 
 export const ClaudeIsland = GObject.registerClass(
@@ -109,12 +124,52 @@ class ClaudeIsland extends PanelMenu.Button {
             }
         }
         // notifica quando o Claude passa a precisar de você
-        if (state === 'waiting' && (this._state !== 'waiting' || this._whoTs !== who.ts))
-            Main.notify(`✋ Claude precisa de você · ${who.project}`, who.message || 'Ele está esperando sua resposta no terminal.');
+        if (state === 'waiting' && (this._state !== 'waiting' || this._whoTs !== who.ts)) {
+            this._notify(`✋ Claude precisa de você · ${who.project}`,
+                who.message || 'Ele está esperando sua resposta no terminal. Clique para abrir.', who.cwd);
+            this._phone(`Claude precisa de você em ${who.project}`);
+        }
         if (state === 'done' && this._state === 'working')
-            Main.notify(`✅ Claude terminou · ${who.project}`, 'Pode conferir o resultado.');
+            this._notify(`✅ Claude terminou · ${who.project}`, 'Clique para ver o resultado.', who.cwd);
         this._whoTs = who?.ts;
         this._setState(state, who);
+    }
+
+    // notificação clicável: traz para a frente o terminal da sessão
+    _notify(title, body, cwd) {
+        if (!this._source) {
+            this._source = new MessageTray.Source({title: 'Claude Code', iconName: 'starred-symbolic'});
+            this._source.connect('destroy', () => {
+                this._source = null;
+            });
+            Main.messageTray.add(this._source);
+        }
+        const n = new MessageTray.Notification({source: this._source, title, body});
+        n.connect('activated', () => focusTerminal(cwd));
+        this._source.addNotification(n);
+    }
+
+    // avisa no celular pelo GSConnect (ping com a mensagem); sem celular pareado, não faz nada
+    _phone(message) {
+        const bus = Gio.DBus.session;
+        const name = 'org.gnome.Shell.Extensions.GSConnect';
+        bus.call(name, '/org/gnome/Shell/Extensions/GSConnect', 'org.freedesktop.DBus.ObjectManager',
+            'GetManagedObjects', null, null, Gio.DBusCallFlags.NONE, 3000, null, (b, res) => {
+                let objects;
+                try {
+                    [objects] = b.call_finish(res).deepUnpack();
+                } catch (e) {
+                    return;   // GSConnect desligado
+                }
+                for (const [path, ifaces] of Object.entries(objects)) {
+                    const dev = ifaces['org.gnome.Shell.Extensions.GSConnect.Device'];
+                    if (!dev || !dev.Connected?.deepUnpack())
+                        continue;
+                    b.call(name, path, 'org.gtk.Actions', 'Activate',
+                        new GLib.Variant('(sava{sv})', ['ping', [new GLib.Variant('s', message)], {}]),
+                        null, Gio.DBusCallFlags.NONE, 3000, null, null);
+                }
+            });
     }
 
     _setState(state, who) {
@@ -161,7 +216,7 @@ class ClaudeIsland extends PanelMenu.Button {
         if (sessions.length) {
             for (const s of sessions.slice(0, 6)) {
                 add(`${EMOJI[s.state] ?? '•'}  ${s.project} — ${LABELS[s.state] ?? s.state} · ${ago(s.ts)}`,
-                    () => terminalIn(s.cwd));
+                    () => focusTerminal(s.cwd));
             }
         } else {
             add('Nenhuma sessão recente');
@@ -194,6 +249,7 @@ class ClaudeIsland extends PanelMenu.Button {
         this._destroyed = true;
         GLib.source_remove(this._timer);
         this._monitor.cancel();
+        this._source?.destroy();
         super.destroy();
     }
 });

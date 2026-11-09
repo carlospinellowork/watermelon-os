@@ -15,11 +15,17 @@ import time
 STATE = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "watermelon", "claude")
 EVENTS = {"UserPromptSubmit": "working", "Notification": "waiting", "Stop": "done", "SessionEnd": None}
 
+raw = sys.stdin.read()   # lê tudo antes de qualquer saída (o Claude Code pode ainda estar escrevendo)
 try:
-    data = json.load(sys.stdin)
+    data = json.loads(raw)
 except ValueError:
     sys.exit(0)
 event = sys.argv[1] if len(sys.argv) > 1 else data.get("hook_event_name", "")
+
+# chamadas internas do melon (commit, PR, revisão…) não são sessões suas: não aparecem na ilha.
+# SessionEnd sempre passa, para nunca deixar uma sessão fantasma.
+if os.environ.get("WATERMELON_NO_ISLAND") == "1" and event != "SessionEnd":
+    sys.exit(0)
 session = "".join(c for c in str(data.get("session_id", "")) if c.isalnum() or c == "-") or "sessao"
 path = os.path.join(STATE, f"{session}.json")
 os.makedirs(STATE, exist_ok=True)

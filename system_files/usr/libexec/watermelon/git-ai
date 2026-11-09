@@ -1,0 +1,302 @@
+#!/usr/bin/env bash
+# Git com IA no WatermelonOS (usa o Claude Code em modo texto: claude -p).
+#
+#   melon commit              o Claude escreve a mensagem do commit a partir do diff
+#   melon pr                  branch (se precisar) + push + PR com título e descrição do Claude
+#   melon revisar             revisão do Claude no que você vai enviar (bugs, segurança, casos de borda)
+#   melon conflitos           abre o Claude para resolver os conflitos de merge
+#   melon tarefa "descrição"  nova tarefa em paralelo: worktree + branch + Claude só para ela
+#   melon tarefa lista|limpar worktrees de tarefas / remove as já mescladas
+#   melon standup [dias]      resumo do que você fez para a daily (copiado para a área de transferência)
+#   melon pergunta "texto"    pergunta rápida ao Claude  (--explicar: explica o que está copiado)
+#
+# Modelo: sonnet com esforço baixo (revisão: médio). Troque com MELON_AI_MODEL e MELON_AI_EFFORT.
+set -uo pipefail
+
+RED=$'\e[38;2;255;84;104m' GRN=$'\e[38;2;125;211;160m' YEL=$'\e[38;2;242;197;107m' DIM=$'\e[2m' B=$'\e[1m' OFF=$'\e[0m'
+step() { printf '\n%s🍉 %s%s\n' "$RED" "$*" "$OFF"; }
+ok()   { printf '   %s✔%s %s\n' "$GRN" "$OFF" "$*"; }
+info() { printf '   %s%s%s\n' "$DIM" "$*" "$OFF"; }
+die()  { printf '   %s✘ %s%s\n' "$RED" "$*" "$OFF" >&2; exit 1; }
+
+MAX_DIFF=60000          # caracteres de diff enviados ao Claude (o resto vira só estatística)
+REPO_DIRS=(Documentos Documents Projetos projetos Projects dev code src repos)
+
+need_repo() {
+  ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || die "rode dentro de um repositório Git"
+  cd "$ROOT" || exit 1
+}
+
+# Chama o Claude só com texto (sem ferramentas, sem salvar sessão). Contexto vem pela entrada padrão.
+# WATERMELON_NO_ISLAND: o hook da ilha ignora estas chamadas (não são sessões suas).
+ai() {
+  command -v claude >/dev/null || die "Claude Code não instalado (curl -fsSL https://claude.ai/install.sh | bash)"
+  # modelo ágil por padrão: commit, PR e standup não precisam de raciocínio longo
+  WATERMELON_NO_ISLAND=1 claude -p --tools "" --no-session-persistence --output-format text \
+    --model "${MELON_AI_MODEL:-sonnet}" --effort "${MELON_AI_EFFORT:-low}" "$1"
+}
+
+# ai com spinner: ai_spin <título> <prompt> <arquivo de contexto>
+ai_spin() {
+  local out
+  out=$(mktemp)
+  if command -v gum >/dev/null && [[ -t 1 ]]; then
+    gum spin --spinner dot --title "$1" -- bash -c '"$0" _ai "$1" < "$2" > "$3"' "$0" "$2" "$3" "$out"
+  else
+    "$0" _ai "$2" < "$3" > "$out"
+  fi
+  cat "$out"
+  rm -f "$out"
+}
+
+clip_diff() {  # clip_diff <arquivo>: corta diffs gigantes mantendo o começo
+  local f=$1
+  if (( $(wc -c < "$f") > MAX_DIFF )); then
+    head -c "$MAX_DIFF" "$f" > "$f.cut" && mv "$f.cut" "$f"
+    printf '\n[... diff cortado: grande demais; use a estatística acima ...]\n' >> "$f"
+  fi
+}
+
+default_branch() {
+  gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null \
+    || git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' \
+    || echo main
+}
+
+show() {  # mostra texto em markdown com cor, se der
+  if command -v bat >/dev/null; then bat --paging=never --style=plain -l md --color=always; else cat; fi
+}
+
+# ------------------------------------------------------------------ commit
+cmd_commit() {
+  need_repo
+  if git diff --cached --quiet; then
+    git diff --quiet && [[ -z $(git ls-files --others --exclude-standard) ]] && die "nada para commitar"
+    git status -s
+    gum confirm "Nada no stage. Adicionar tudo (git add -A)?" || exit 0
+    git add -A
+  fi
+  local ctx; ctx=$(mktemp)
+  {
+    echo "## Últimas mensagens de commit deste repositório (siga o mesmo idioma e estilo)"
+    git log -15 --format='- %s' 2>/dev/null
+    echo; echo "## Arquivos"; git diff --cached --stat
+    echo; echo "## Diff"; git diff --cached
+  } > "$ctx"
+  clip_diff "$ctx"
+  step "Commit com IA"
+  local msg
+  msg=$(ai_spin "Claude lendo o diff…" "Escreva a mensagem de commit para o diff da entrada. Use o mesmo idioma e estilo das mensagens anteriores do repositório. Primeira linha: resumo no imperativo com no máximo 72 caracteres. Se ajudar, uma linha em branco e um corpo curto em tópicos explicando o porquê. Responda só com a mensagem, sem cercas de código nem comentários." "$ctx")
+  rm -f "$ctx"
+  [[ -n ${msg// } ]] || die "o Claude não devolveu mensagem"
+  printf '\n%s\n\n' "$msg" | sed 's/^/   /'
+  local f; f=$(mktemp)
+  printf '%s\n' "$msg" > "$f"
+  case $(gum choose "Commitar" "Editar antes" "Cancelar") in
+    Commitar)       git commit -F "$f" && ok "commit feito" ;;
+    "Editar antes") git commit -e -F "$f" && ok "commit feito" ;;
+    *)              info "cancelado (o stage continua como estava)" ;;
+  esac
+  rm -f "$f"
+}
+
+# ------------------------------------------------------------------ PR
+cmd_pr() {
+  need_repo
+  command -v gh >/dev/null || die "GitHub CLI não instalado"
+  gh auth status >/dev/null 2>&1 || die "entre no GitHub primeiro: melon setup git"
+  local base branch; base=$(default_branch); branch=$(git branch --show-current)
+  step "Pull request com IA"
+
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    info "há mudanças sem commit"
+    gum confirm "Fazer o commit com IA antes?" && cmd_commit
+  fi
+
+  if [[ $branch == "$base" ]]; then
+    git fetch -q origin "$base" 2>/dev/null
+    [[ -n $(git log "origin/$base..HEAD" --oneline 2>/dev/null) ]] || die "nenhum commit novo em $base para virar PR"
+    local ctx sug name; ctx=$(mktemp)
+    git log "origin/$base..HEAD" --format='- %s' > "$ctx"
+    sug=$(ai_spin "Sugerindo nome da branch…" "Sugira um nome de branch git curto em kebab-case (ex.: feat/login-google, fix/timeout-api) para estes commits. Responda só com o nome." "$ctx" | tr -d '[:space:]')
+    rm -f "$ctx"
+    name=$(gum input --header "Você está em $base. Nome da nova branch:" --value "$sug") || exit 0
+    [[ -n $name ]] || exit 0
+    git switch -c "$name" || exit 1
+    branch=$name
+    git branch -f "$base" "origin/$base" 2>/dev/null   # devolve a base ao estado do remoto
+  fi
+
+  git push -u origin "$branch" || die "push falhou"
+  ok "branch $branch enviada"
+
+  local ctx; ctx=$(mktemp)
+  {
+    echo "## Commits"; git log "origin/$base..HEAD" --format='- %s%n%b' 2>/dev/null
+    echo; echo "## Arquivos"; git diff "origin/$base...HEAD" --stat
+    echo; echo "## Diff"; git diff "origin/$base...HEAD"
+  } > "$ctx"
+  clip_diff "$ctx"
+  local out title body
+  out=$(ai_spin "Claude escrevendo o PR…" "Escreva um pull request para estas mudanças, no mesmo idioma dos commits. Primeira linha: o título (até 70 caracteres, sem prefixo 'Título:'). Depois uma linha em branco e a descrição em Markdown com as seções: Resumo (2-4 tópicos do que muda e por quê), Como testar (passos objetivos) e, se houver, Pontos de atenção. Responda só com isso." "$ctx")
+  rm -f "$ctx"
+  title=$(head -1 <<<"$out" | sed 's/^#* *//')
+  body=$(tail -n +3 <<<"$out")
+  printf '\n   %s%s%s\n\n' "$B" "$title" "$OFF"; show <<<"$body" | sed 's/^/   /'; echo
+  local bf; bf=$(mktemp); printf '%s\n' "$body" > "$bf"
+  local choice; choice=$(gum choose "Criar PR" "Criar como rascunho" "Editar no navegador" "Cancelar")
+  case $choice in
+    "Criar PR")            gh pr create --base "$base" --title "$title" --body-file "$bf" ;;
+    "Criar como rascunho") gh pr create --base "$base" --title "$title" --body-file "$bf" --draft ;;
+    "Editar no navegador") gh pr create --base "$base" --title "$title" --body-file "$bf" --web ;;
+    *) info "cancelado (a branch já está no GitHub)" ;;
+  esac
+  rm -f "$bf"
+}
+
+# ------------------------------------------------------------------ revisão
+cmd_review() {
+  need_repo
+  local ctx what; ctx=$(mktemp)
+  if ! git diff --quiet HEAD 2>/dev/null; then
+    what="mudanças ainda não commitadas"
+    { git diff HEAD --stat; echo; git diff HEAD; } > "$ctx"
+  elif git rev-parse '@{u}' >/dev/null 2>&1 && [[ -n $(git log '@{u}..HEAD' --oneline) ]]; then
+    what="commits ainda não enviados"
+    { git log '@{u}..HEAD' --format='- %s'; echo; git diff '@{u}...HEAD'; } > "$ctx"
+  else
+    local base; base=$(default_branch)
+    what="diferença para $base"
+    { git log "origin/$base..HEAD" --format='- %s'; echo; git diff "origin/$base...HEAD"; } > "$ctx" 2>/dev/null
+  fi
+  [[ -s $ctx ]] || { rm -f "$ctx"; die "nada para revisar"; }
+  clip_diff "$ctx"
+  step "Revisão do Claude ($what)"
+  MELON_AI_EFFORT=${MELON_AI_EFFORT:-medium} ai_spin "Claude revisando…" "Revise este diff como um engenheiro sênior. Procure bugs de verdade, problemas de segurança, casos de borda e código que vai quebrar em produção. Ignore estilo e gosto pessoal. Responda em português, em Markdown, com uma lista curta: cada item começa com 🔴 (bug/segurança), 🟡 (risco) ou 🟢 (sugestão), cita arquivo:linha e diz como corrigir. Se estiver tudo bem, diga só '✅ Nada importante encontrado.'" "$ctx" | show
+  rm -f "$ctx"
+}
+
+# ------------------------------------------------------------------ conflitos
+cmd_conflicts() {
+  need_repo
+  mapfile -t files < <(git diff --name-only --diff-filter=U)
+  ((${#files[@]})) || { ok "nenhum conflito de merge aqui"; exit 0; }
+  step "Conflitos em ${#files[@]} arquivo(s)"
+  printf '   %s\n' "${files[@]}"
+  exec claude "Há conflitos de merge em: ${files[*]}. Para cada arquivo, explique em poucas linhas o que cada lado queria, proponha a resolução que preserva as duas intenções e só aplique depois que eu confirmar. No fim, rode os testes se existirem e me diga o comando para concluir o merge."
+}
+
+# ------------------------------------------------------------------ tarefas em paralelo (worktrees)
+slug() { iconv -f utf8 -t ascii//TRANSLIT <<<"$1" 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//; s/-$//' | cut -c1-40; }
+
+cmd_task() {
+  need_repo
+  # a raiz do repositório principal (se já estiver dentro de uma worktree)
+  local main; main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+  local dir="${main}-tarefas"
+  case "${1:-}" in
+    lista|list)
+      git -C "$main" worktree list
+      exit 0 ;;
+    limpar|clean)
+      local base; base=$(default_branch)
+      git -C "$main" fetch -q origin 2>/dev/null
+      git -C "$main" worktree list --porcelain | awk '/^worktree /{w=$2} /^branch /{print w, $2}' | while read -r w ref; do
+        b=${ref#refs/heads/}
+        [[ $w == "$main" || $b != tarefa/* ]] && continue
+        if git -C "$main" branch --merged "origin/$base" | grep -qw "$b"; then
+          git -C "$main" worktree remove "$w" && git -C "$main" branch -d "$b" >/dev/null && ok "removida: $b (já mesclada)"
+        else
+          info "mantida: $b (ainda não mesclada)"
+        fi
+      done
+      exit 0 ;;
+  esac
+  local desc="${*:-}"
+  [[ -n $desc ]] || desc=$(gum input --header "O que o Claude vai fazer nesta tarefa?" --placeholder "ex.: adicionar login com Google") || exit 0
+  [[ -n $desc ]] || exit 0
+  local s branch wt; s=$(slug "$desc"); branch="tarefa/$s"; wt="$dir/$s"
+  step "Nova tarefa em paralelo"
+  mkdir -p "$dir"
+  git -C "$main" worktree add -b "$branch" "$wt" HEAD >/dev/null || die "não deu para criar a worktree"
+  ok "worktree: ${wt/#$HOME/\~}  (branch $branch)"
+  info "as variáveis do cofre (melon env) do projeto valem aqui também"
+  setsid ghostty --working-directory="$wt" -e claude "$desc" >/dev/null 2>&1 &
+  ok "Claude aberto numa janela nova. Acompanhe pela ilha do Claude na barra."
+  info "quando terminar: melon pr (dentro da worktree) · depois: melon tarefa limpar"
+}
+
+# ------------------------------------------------------------------ standup
+find_repos() {
+  local dirs=()
+  for d in "${REPO_DIRS[@]}"; do [[ -d $HOME/$d ]] && dirs+=("$HOME/$d"); done
+  ((${#dirs[@]})) || return
+  find "${dirs[@]}" -maxdepth 4 -name .git -not -path '*/node_modules/*' -prune 2>/dev/null | sed 's#/\.git$##' | sort -u
+}
+
+cmd_standup() {
+  local days=${1:-}
+  if [[ -z $days ]]; then days=1; [[ $(date +%u) == 1 ]] && days=3; fi   # segunda-feira pega a sexta
+  local since; since=$(date -d "-$days days 00:00" '+%Y-%m-%d %H:%M')
+  local email; email=$(git config --global user.email)
+  local ctx; ctx=$(mktemp)
+  local n=0
+  while read -r repo; do
+    [[ -n $repo ]] || continue
+    local log; log=$(git -C "$repo" log --all --since="$since" --author="$email" --format='- %s (%ad)' --date=format:'%a %H:%M' 2>/dev/null)
+    local wip; wip=$(git -C "$repo" status --porcelain 2>/dev/null | head -5)
+    if [[ -n $log || -n $wip ]]; then
+      {
+        echo "## $(basename "$repo")  (branch atual: $(git -C "$repo" branch --show-current))"
+        [[ -n $log ]] && echo "$log"
+        [[ -n $wip ]] && echo "(mudanças em andamento sem commit: $(wc -l <<<"$wip") arquivo(s))"
+        echo
+      } >> "$ctx"
+      n=$((n + 1))
+    fi
+  done < <(find_repos)
+  step "Standup (desde $since)"
+  if ((n == 0)); then rm -f "$ctx"; info "nenhum commit seu nesse período"; exit 0; fi
+  local out
+  out=$(ai_spin "Claude resumindo seu trabalho…" "Escreva meu resumo para a daily em português, curto e em linguagem que o time entende (não liste commit por commit). Formato: 'Ontem:' com 2 a 5 tópicos agrupando por projeto e pelo resultado; 'Hoje:' com 1 a 3 tópicos prováveis, baseados no que está em andamento; 'Bloqueios: nenhum'. Sem títulos Markdown, sem emojis." "$ctx")
+  rm -f "$ctx"
+  printf '\n%s\n\n' "$out" | sed 's/^/   /'
+  # o wl-copy fica rodando para servir o conteúdo copiado: não pode herdar a saída do terminal
+  if command -v wl-copy >/dev/null && printf '%s\n' "$out" | wl-copy >/dev/null 2>&1; then
+    ok "copiado: é só colar na daily"
+  fi
+}
+
+# ------------------------------------------------------------------ pergunta rápida
+cmd_ask() {
+  local ctx; ctx=$(mktemp)
+  local prompt
+  if [[ ${1:-} == --explicar ]]; then
+    shift
+    wl-paste --no-newline > "$ctx" 2>/dev/null || die "não consegui ler a área de transferência"
+    [[ -s $ctx ]] || die "a área de transferência está vazia"
+    step "Explicando o que você copiou"
+    prompt="Explique em português o que é o texto da entrada (erro, log, trecho de código ou comando). Se for um erro: a causa provável e como resolver, com o comando ou código exato. Seja direto, em Markdown curto. ${*:-}"
+  else
+    local q="${*:-}"
+    [[ -n $q ]] || q=$(gum input --header "Pergunte ao Claude" --placeholder "ex.: como desfaço o último commit sem perder as mudanças?") || exit 0
+    [[ -n $q ]] || exit 0
+    step "$q"
+    : > "$ctx"
+    prompt="Responda em português, direto e em Markdown curto, para um desenvolvedor usando Linux (Fedora/GNOME, zsh). Se a resposta for um comando, mostre o comando primeiro. Pergunta: $q"
+  fi
+  ai_spin "Claude pensando…" "$prompt" "$ctx" | show
+  rm -f "$ctx"
+}
+
+case "${1:-}" in
+  _ai)              shift; ai "$@" ;;
+  commit)           shift; cmd_commit "$@" ;;
+  pr)               shift; cmd_pr "$@" ;;
+  revisar|review)   shift; cmd_review "$@" ;;
+  conflitos)        shift; cmd_conflicts "$@" ;;
+  tarefa|task)      shift; cmd_task "$@" ;;
+  standup|daily)    shift; cmd_standup "$@" ;;
+  pergunta|ask|"?") shift; cmd_ask "$@" ;;
+  *) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

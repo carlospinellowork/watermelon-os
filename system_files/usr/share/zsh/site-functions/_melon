@@ -13,6 +13,13 @@ _melon() {
     'env:cofre de variáveis dos projetos'
     'foco:modo foco com Pomodoro'
     'claude-ilha:liga a ilha do Claude na barra'
+    'commit:o Claude escreve a mensagem do commit'
+    'pr:branch, push e PR escrito pelo Claude'
+    'revisar:revisão do Claude antes de enviar'
+    'conflitos:resolve conflitos de merge com o Claude'
+    'tarefa:tarefa em paralelo com worktree e Claude'
+    'standup:resumo para a daily'
+    'pergunta:pergunta rápida ao Claude'
     'status:versão do sistema e atualizações pendentes'
     'version:versão do melon'
     'help:ajuda'
@@ -36,6 +43,10 @@ _melon() {
     _describe 'ação' o
   elif [[ ${words[2]} == env && ${words[3]} == (edit|use|export|run) ]] && (( CURRENT == 4 )); then
     local -a o=('dev:desenvolvimento' 'prod:produção'); _describe 'modo' o
+  elif [[ ${words[2]} == tarefa ]] && (( CURRENT == 3 )); then
+    local -a o=('lista:worktrees de tarefas' 'limpar:remove as tarefas já mescladas'); _describe 'ação' o
+  elif [[ ${words[2]} == pergunta ]] && (( CURRENT == 3 )); then
+    local -a o=('--explicar:explica o que está na área de transferência'); _describe 'opção' o
   elif [[ ${words[2]} == install ]] && (( CURRENT == 3 )); then
     _files -g '*.(exe|EXE|msi|MSI|apk|deb|rpm|AppImage|appimage|flatpakref)(-.)'
   fi

@@ -59,12 +59,20 @@ export function terminalIn(dir, argv = null) {
     Util.spawn(['ghostty', `--working-directory=${dir}`, ...(argv ? ['-e', ...argv] : [])]);
 }
 
+// roda um comando no terminal e mantém a janela aberta no fim (para ler o resultado)
+export function terminalHold(dir, argv) {
+    const cmd = argv.map(a => GLib.shell_quote(a)).join(' ');
+    terminalIn(dir, ['bash', '-c', `${cmd}; echo; read -n1 -rsp "Pressione uma tecla para fechar"`]);
+}
+
 const CHECK = {SUCCESS: '✅', FAILURE: '❌', ERROR: '❌', PENDING: '🟡', IN_PROGRESS: '🟡', QUEUED: '🟡'};
 
 export const GitIsland = GObject.registerClass(
 class GitIsland extends PanelMenu.Button {
-    _init(extPath) {
+    _init(extPath, gitAi) {
         super._init(0.0, 'Git');
+        this._gitAi = gitAi;   // /usr/libexec/watermelon/git-ai (melon commit, pr, revisar…)
+        this._reviews = [];
         const box = new St.BoxLayout({style_class: 'panel-status-menu-box wm-chip', y_align: Clutter.ActorAlign.CENTER});
         box.add_child(new St.Icon({gicon: Gio.FileIcon.new(Gio.File.new_for_path(`${extPath}/icons/wm-git.svg`)),
             style_class: 'system-status-icon wm-chip-icon'}));
@@ -103,7 +111,7 @@ class GitIsland extends PanelMenu.Button {
         const r = await run(['git', 'status', '--porcelain=v2', '--branch'], this._root);
         if (this._destroyed || !r.ok)
             return;
-        const s = {branch: '?', ahead: 0, behind: 0, files: []};
+        const s = {branch: '?', ahead: 0, behind: 0, files: [], conflicts: 0};
         for (const line of r.out.split('\n')) {
             if (line.startsWith('# branch.head '))
                 s.branch = line.slice(14);
@@ -115,18 +123,24 @@ class GitIsland extends PanelMenu.Button {
                 const parts = line.split(' ');
                 const code = line[0] === '?' ? '??' : parts[1].replace(/\./g, '');
                 s.files.push(`${code.padEnd(2)} ${parts[parts.length - 1]}`);
+                if (line[0] === 'u')
+                    s.conflicts++;
             }
         }
         if (s.branch !== this._s?.branch)
             this._prAt = 0;
         this._s = s;
         let text = s.branch;
+        if (s.conflicts)
+            text += ` ⚠${s.conflicts}`;
         if (s.files.length)
             text += ` ●${s.files.length}`;
         if (s.ahead)
             text += ` ↑${s.ahead}`;
         if (s.behind)
             text += ` ↓${s.behind}`;
+        if (this._reviews.length)
+            text = `👀${this._reviews.length}  ${text}`;
         this._label.text = text;
         this.visible = true;
 
@@ -137,6 +151,18 @@ class GitIsland extends PanelMenu.Button {
                 this._pr = pr.ok ? JSON.parse(pr.out) : null;
             } catch (e) {
                 this._pr = null;
+            }
+            // PRs (de qualquer repositório) em que pediram sua revisão
+            const rv = await run(['gh', 'search', 'prs', '--review-requested=@me', '--state=open',
+                '--json', 'number,title,url,repository', '--limit', '10']);
+            try {
+                const list = rv.ok ? JSON.parse(rv.out) : [];
+                if (list.length > this._reviews.length && this._reviewsLoaded)
+                    Main.notify('👀 Pediram sua revisão', list[0].title);
+                this._reviews = list;
+                this._reviewsLoaded = true;
+            } catch (e) {
+                // sem rede ou sem gh: mantém a lista anterior
             }
         }
     }
@@ -192,7 +218,27 @@ class GitIsland extends PanelMenu.Button {
         if (pr)
             add(pr, () => Gio.AppInfo.launch_default_for_uri(this._pr.url, global.create_app_launch_context(0, -1)));
 
-        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+        if (this._reviews.length) {
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem('Pedem sua revisão'));
+            for (const p of this._reviews.slice(0, 5)) {
+                add(`👀 ${p.repository?.name ?? ''} #${p.number}: ${p.title}`,
+                    () => Gio.AppInfo.launch_default_for_uri(p.url, global.create_app_launch_context(0, -1)));
+            }
+        }
+
+        // ---- com IA (Claude)
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem('Com o Claude'));
+        if (s.conflicts)
+            add(`⚠ Resolver ${s.conflicts} conflito(s) com o Claude`, () => terminalIn(root, [this._gitAi, 'conflitos']));
+        if (s.files.length)
+            add('✳ Commit com IA', () => terminalHold(root, [this._gitAi, 'commit']));
+        add(this._pr ? '✳ Atualizar PR (push)' : '✳ Abrir PR com IA', () => (this._pr
+            ? this._gitAction('push', ['git', 'push'])
+            : terminalHold(root, [this._gitAi, 'pr'])));
+        add('✳ Revisar com o Claude', () => terminalHold(root, [this._gitAi, 'revisar']));
+        add('✳ Nova tarefa em paralelo…', () => terminalHold(root, [this._gitAi, 'tarefa']));
+
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem('Git'));
         add('Commit… (lazygit)', () => terminalIn(root, ['lazygit']));
         add(`Enviar (push)${s.ahead ? ` ↑${s.ahead}` : ''}`, () => this._gitAction('push', ['git', 'push']));
         add(`Receber (pull)${s.behind ? ` ↓${s.behind}` : ''}`, () => this._gitAction('pull', ['git', 'pull', '--ff-only']));

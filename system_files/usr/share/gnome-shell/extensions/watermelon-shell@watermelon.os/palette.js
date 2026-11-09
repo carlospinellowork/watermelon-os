@@ -19,7 +19,7 @@ import * as SystemActions from 'resource:///org/gnome/shell/misc/systemActions.j
 import * as Util from 'resource:///org/gnome/shell/misc/util.js';
 
 import {listPorts, openPort, killPid} from './ports.js';
-import {currentProject, run, terminalIn} from './git.js';
+import {currentProject, run, terminalHold, terminalIn} from './git.js';
 
 const MAX_RESULTS = 8;
 const REPO_DIRS = ['Documentos', 'Documents', 'Projetos', 'projetos', 'Projects', 'dev', 'code', 'src', 'repos'];
@@ -44,8 +44,9 @@ function melon(args) {
 }
 
 export class Palette {
-    constructor(settings) {
+    constructor(settings, gitAi) {
         this._settings = settings;
+        this._gitAi = gitAi;   // melon commit / pr / revisar / tarefa / standup / pergunta
         this._iface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         this._notif = new Gio.Settings({schema_id: 'org.gnome.desktop.notifications'});
         this._actions = SystemActions.getDefault();
@@ -97,6 +98,10 @@ export class Palette {
                 run: () => melon('doctor')},
             {title: 'Atualizações do sistema', icon: 'software-update-available-symbolic', keys: 'update atualizar versao',
                 run: () => melon('status')},
+            {title: 'Explicar o que copiei (Claude)', icon: 'edit-paste-symbolic', keys: 'erro explicar clipboard area transferencia ia claude',
+                run: () => terminalHold(proj ?? GLib.get_home_dir(), [this._gitAi, 'pergunta', '--explicar'])},
+            {title: 'Standup para a daily (Claude)', icon: 'x-office-document-symbolic', keys: 'daily resumo ontem standup reuniao',
+                run: () => terminalHold(GLib.get_home_dir(), [this._gitAi, 'standup'])},
             {title: 'Bloquear a tela', icon: 'system-lock-screen-symbolic', keys: 'lock sair',
                 run: () => this._actions.activateLockScreen()},
             {title: 'Suspender', icon: 'weather-clear-night-symbolic', keys: 'dormir sleep',
@@ -110,6 +115,14 @@ export class Palette {
             cmds.push(
                 {title: `Claude em ${projName}`, icon: 'starred-symbolic', keys: 'claude ia ai assistente',
                     run: () => terminalIn(proj, ['claude'])},
+                {title: `Commit com IA em ${projName}`, icon: 'document-save-symbolic', keys: 'git commit mensagem ia claude',
+                    run: () => terminalHold(proj, [this._gitAi, 'commit'])},
+                {title: `Abrir PR com IA em ${projName}`, icon: 'emblem-shared-symbolic', keys: 'git pull request pr github ia claude',
+                    run: () => terminalHold(proj, [this._gitAi, 'pr'])},
+                {title: `Revisar ${projName} com o Claude`, icon: 'edit-find-symbolic', keys: 'git review revisao bugs ia claude',
+                    run: () => terminalHold(proj, [this._gitAi, 'revisar'])},
+                {title: `Nova tarefa em paralelo em ${projName}`, icon: 'list-add-symbolic', keys: 'tarefa worktree branch paralelo claude',
+                    run: () => terminalHold(proj, [this._gitAi, 'tarefa'])},
                 {title: `Git: lazygit em ${projName}`, icon: 'emblem-shared-symbolic', keys: 'git commit lazygit',
                     run: () => terminalIn(proj, ['lazygit'])},
                 {title: `Cofre de envs de ${projName}`, icon: 'dialog-password-symbolic', keys: 'env cofre variaveis vault segredos',
@@ -123,6 +136,13 @@ export class Palette {
         const text = q.trim();
         const nq = norm(text);
         const out = [];
+
+        // "? pergunta" -> Claude
+        if (text.startsWith('?') && text.length > 1) {
+            const q = text.slice(1).trim();
+            return [{title: `Perguntar ao Claude: ${q}`, icon: 'dialog-question-symbolic', hint: 'Enter',
+                run: () => terminalHold(currentProject() ?? GLib.get_home_dir(), [this._gitAi, 'pergunta', q])}];
+        }
 
         // calculadora
         if (/^[\d\s+\-*/().,%^]+$/.test(text) && /\d/.test(text) && /[+\-*/%^]/.test(text)) {
@@ -160,6 +180,8 @@ export class Palette {
         out.push(...(words.length ? ranked : ranked.slice(0, MAX_RESULTS)));
 
         if (text && !out.some(c => !c.web)) {
+            out.push({title: `Perguntar ao Claude: ${text}`, icon: 'dialog-question-symbolic', web: true,
+                run: () => terminalHold(currentProject() ?? GLib.get_home_dir(), [this._gitAi, 'pergunta', text])});
             out.push({title: `Pesquisar “${text}” na web`, icon: 'system-search-symbolic', web: true,
                 run: () => Gio.AppInfo.launch_default_for_uri(`https://www.google.com/search?q=${encodeURIComponent(text)}`,
                     global.create_app_launch_context(0, -1))});
@@ -209,7 +231,7 @@ export class Palette {
         shield.connect('clicked', () => this.close());
         this._backdrop.add_child(shield);
         this._box = new St.BoxLayout({style_class: 'wm-palette', orientation: Clutter.Orientation.VERTICAL, width: 640});
-        this._entry = new St.Entry({style_class: 'wm-palette-entry', hint_text: 'O que você quer fazer?', can_focus: true});
+        this._entry = new St.Entry({style_class: 'wm-palette-entry', hint_text: 'O que você quer fazer?  (? pergunta ao Claude)', can_focus: true});
         this._entry.set_primary_icon(new St.Icon({icon_name: 'system-search-symbolic', style_class: 'wm-palette-search-icon'}));
         this._list = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'wm-palette-list'});
         this._box.add_child(this._entry);

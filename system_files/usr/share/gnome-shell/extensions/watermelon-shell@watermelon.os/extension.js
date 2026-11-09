@@ -65,7 +65,7 @@ export default class WatermelonShell extends Extension {
                 return p;
             },
             'git-island': () => {
-                const g = new GitIsland(this._realPath);
+                const g = new GitIsland(this._realPath, libexec(this._realPath, 'git-ai'));
                 Main.panel.addToStatusArea('watermelon-git', g, 2, 'left');
                 return g;
             },
@@ -75,7 +75,7 @@ export default class WatermelonShell extends Extension {
                 return c;
             },
             'island-notifications': () => new NotificationPeek(),
-            'palette': () => new Palette(this._settings),
+            'palette': () => new Palette(this._settings, libexec(this._realPath, 'git-ai')),
             'focus': () => new Focus(this._settings),
         };
         for (const key of Object.keys(this._features)) {
