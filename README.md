@@ -41,6 +41,10 @@ Instale, entre no GitHub e no Claude, e em minutos seu computador está pronto p
 | 🍉 **Menu melancia, widgets e Dock em Arco** | atalhos do sistema no canto, relógio/sistema/música na área de trabalho e dock que abre em arco na lateral |
 | 🧭 **Paleta de comandos** | <kbd>Super</kbd>+<kbd>K</kbd>: tema, foco, Wi-Fi, print, portas, repositórios, calculadora… tudo digitando |
 | 🌿 **Ilhas de Git e Claude** | branch e mudanças do projeto atual (commit, push, PR); o Claude Code avisa quando está trabalhando, precisa de você ou terminou |
+| ✳️ **Git com IA** | `melon commit` (mensagem escrita pelo Claude), `melon pr` (branch + push + PR descrito), `melon revisar` (revisão antes de enviar), `melon conflitos` |
+| 🧵 **Tarefas em paralelo** | `melon tarefa "…"`: worktree + branch + um Claude só para ela; a ilha mostra cada sessão |
+| 📣 **Claude te chama** | aviso clicável que traz o terminal certo para a frente, e no celular pelo GSConnect |
+| 🗣️ **Pergunte de qualquer lugar** | <kbd>Super</kbd>+<kbd>K</kbd> e `? sua pergunta`, "explicar o que copiei" e `melon standup` para a daily |
 | 🔌 **Portas abertas** | seus servidores de dev (localhost:3000…) na barra: abrir no navegador ou encerrar |
 | 🍅 **Modo foco** | Pomodoro na barra com não perturbe (`melon foco`) |
 | 🔐 **Cofre de envs** | `melon env`: variáveis dos projetos criptografadas no chaveiro, carregadas sozinhas ao entrar na pasta, modo dev/PROD no prompt |
@@ -101,6 +105,13 @@ Ghostty + zsh já configurados:
 | `melon foco [min]` | Pomodoro na barra com notificações em silêncio |
 | `melon personalizar` | Cursor, ícones, papel de parede, cores, fontes, barra e dock |
 | `melon claude-ilha` | Liga a ilha do Claude na barra (hooks do Claude Code) |
+| `melon commit` | O Claude escreve a mensagem do commit a partir do diff; você revisa e confirma |
+| `melon pr` | Cria a branch se precisar, faz push e abre o PR com título e descrição escritos pelo Claude |
+| `melon revisar` | Revisão do Claude no que você vai enviar: bugs, segurança, casos de borda |
+| `melon conflitos` | Abre o Claude para resolver os conflitos de merge, explicando antes de aplicar |
+| `melon tarefa "…"` | Tarefa em paralelo: worktree + branch + Claude numa janela própria (`lista`, `limpar`) |
+| `melon standup` | Resumo do que você fez para a daily, já copiado |
+| `melon pergunta "…"` | Pergunta rápida ao Claude (`--explicar` explica o que está copiado) |
 | `melon status` | Versão do sistema e atualizações pendentes |
 
 ## 🍉 Instalar
