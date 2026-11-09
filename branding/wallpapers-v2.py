@@ -68,6 +68,17 @@ def glow(tmp, name, draw, sigma):
     return out
 
 
+def logo_shadow(ctx, tmp, name, x, y, size, dy=26, sigma=34, alpha=0.55):
+    """Sombra suave do logo: silhueta preta, deslocada para baixo e desfocada."""
+    def draw(cc):
+        cc.push_group()
+        svg(cc, LOGO, x, y + dy, size, size)
+        mask = cc.pop_group()
+        cc.set_source_rgba(0, 0, 0, alpha)
+        cc.mask(mask)
+    paste(ctx, glow(tmp, name, draw, sigma))
+
+
 def grain(ctx, amount=0.025, seed=7):
     """Granulado sutil: evita faixas (banding) nos degradês."""
     rnd = random.Random(seed)
@@ -173,6 +184,7 @@ def orbit(out, tmp):
         cc.set_source_rgba(1, 0.55, 0.62, 0.55)
         cc.fill()
     paste(c, glow(tmp, "halo", halo, 160))
+    logo_shadow(c, tmp, "orbit-shadow", lx, ly, ls)
     svg(c, LOGO, lx, ly, ls, ls)
 
     grain(c)
@@ -241,8 +253,10 @@ def glass(out, tmp, dark):
     px, py = (W - pw) / 2, (H - ph) / 2
     pane(px, py, pw, ph, 200, 0.10 if dark else 0.28, 0.40 if dark else 0.75)
 
-    ls = 500
-    svg(c, LOGO, (W - ls) / 2, (H - ls) / 2 + 10, ls, ls)
+    ls = 600
+    lx, ly = (W - ls) / 2, (H - ls) / 2 - 6
+    logo_shadow(c, tmp, f"glass-shadow-{dark}", lx, ly, ls, dy=22, sigma=28, alpha=0.5 if dark else 0.3)
+    svg(c, LOGO, lx, ly, ls, ls)
 
     grain(c, 0.03 if dark else 0.02)
     s.write_to_png(out)

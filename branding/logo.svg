@@ -1,36 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <title>WatermelonOS</title>
   <defs>
-    <!-- Mordida na lateral direita: três marcas de dente, a do meio mais funda -->
-    <mask id="bite">
-      <rect width="512" height="512" fill="#fff"/>
-      <circle cx="350" cy="158" r="30" fill="#000"/>
-      <circle cx="366" cy="200" r="34" fill="#000"/>
-      <circle cx="398" cy="231" r="30" fill="#000"/>
-    </mask>
-    <linearGradient id="flesh" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ff5468"/>
-      <stop offset="1" stop-color="#e8304a"/>
+    <linearGradient id="wm-flesh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff5a6e"/><stop offset="1" stop-color="#e3243f"/>
     </linearGradient>
+    <clipPath id="wm-clip"><path d="M231.73 91.41 L55.75 333.62 A30 30 0 0 0 64.59 376.97 A372 372 0 0 0 447.41 376.97 A30 30 0 0 0 456.25 333.62 L280.27 91.41 A30 30 0 0 0 231.73 91.41 Z"/></clipPath>
+    <mask id="wm-bite" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/><circle cx="350.17" cy="179.35" r="26" fill="#000"/><circle cx="386.5" cy="223.85" r="31" fill="#000"/>
+    </mask>
   </defs>
-
-  <g transform="translate(0 31)">
-  <g mask="url(#bite)">
-    <!-- casca externa -->
-    <path d="M40 362 Q256 472 472 362 L256 32 Z" fill="#1e7a3c"/>
-    <!-- casca clara -->
-    <path d="M52 344 Q256 450 460 344 L256 32 Z" fill="#a8e6a1"/>
-    <!-- polpa -->
-    <path d="M64 326 Q256 428 448 326 L256 32 Z" fill="url(#flesh)"/>
-    <!-- sementes -->
-    <g fill="#2a1a17">
-      <path d="M256 128 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
-      <path d="M222 198 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
-      <path d="M290 198 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
-      <path d="M186 268 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
-      <path d="M256 268 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
-      <path d="M326 268 q9 -2 9 13 q-2 14 -9 20 q-7 -6 -9 -20 q0 -15 9 -13 Z"/>
+  <g mask="url(#wm-bite)">
+    <g clip-path="url(#wm-clip)">
+      <circle cx="256" cy="58" r="376" fill="#17703a"/>
+      <circle cx="256" cy="58" r="329.22" fill="#c9f2bd"/>
+      <circle cx="256" cy="58" r="314.34" fill="url(#wm-flesh)"/>
+      <g fill="#24130f"><path transform="translate(256 176) rotate(0)" d="M0 -24.0 C7.15 -10.8 13.0 3.5999999999999996 13.0 10.08 A13.0 12.35 0 0 1 -13.0 10.08 C-13.0 3.5999999999999996 -7.15 -10.8 0 -24.0 Z"/><path transform="translate(294.67 239.94) rotate(12)" d="M0 -25.200000000000003 C7.507500000000001 -11.340000000000002 13.65 3.7800000000000002 13.65 10.584000000000001 A13.65 12.9675 0 0 1 -13.65 10.584000000000001 C-13.65 3.7800000000000002 -7.507500000000001 -11.340000000000002 0 -25.200000000000003 Z"/><path transform="translate(217.33 239.94) rotate(-12)" d="M0 -25.200000000000003 C7.507500000000001 -11.340000000000002 13.65 3.7800000000000002 13.65 10.584000000000001 A13.65 12.9675 0 0 1 -13.65 10.584000000000001 C-13.65 3.7800000000000002 -7.507500000000001 -11.340000000000002 0 -25.200000000000003 Z"/><path transform="translate(345.59 291.4) rotate(21)" d="M0 -26.400000000000002 C7.865000000000001 -11.88 14.3 3.96 14.3 11.088000000000001 A14.3 13.585 0 0 1 -14.3 11.088000000000001 C-14.3 3.96 -7.865000000000001 -11.88 0 -26.400000000000002 Z"/><path transform="translate(256 308) rotate(0)" d="M0 -26.400000000000002 C7.865000000000001 -11.88 14.3 3.96 14.3 11.088000000000001 A14.3 13.585 0 0 1 -14.3 11.088000000000001 C-14.3 3.96 -7.865000000000001 -11.88 0 -26.400000000000002 Z"/><path transform="translate(166.41 291.4) rotate(-21)" d="M0 -26.400000000000002 C7.865000000000001 -11.88 14.3 3.96 14.3 11.088000000000001 A14.3 13.585 0 0 1 -14.3 11.088000000000001 C-14.3 3.96 -7.865000000000001 -11.88 0 -26.400000000000002 Z"/></g>
+      <path d="M216 128 Q146 268 106 318" stroke="#fff" stroke-opacity=".22" stroke-width="16" stroke-linecap="round" fill="none"/>
     </g>
-  </g>
+    <path d="M231.73 91.41 L55.75 333.62 A30 30 0 0 0 64.59 376.97 A372 372 0 0 0 447.41 376.97 A30 30 0 0 0 456.25 333.62 L280.27 91.41 A30 30 0 0 0 231.73 91.41 Z" fill="none" stroke="#0f5229" stroke-opacity=".35" stroke-width="3"/>
   </g>
 </svg>

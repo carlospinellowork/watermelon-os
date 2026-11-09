@@ -1,43 +1,39 @@
 #!/usr/bin/env bash
-# Gera icon.svg, wordmark-*.svg e os PNGs a partir de logo.svg (a fonte única).
-# Uso: ./generate.sh   (precisa de docker; renderiza com rsvg-convert num Alpine)
+# Gera toda a identidade a partir do código:
+#   logo.py      -> logo.svg, logo-small.svg, icon.svg, icon-small.svg, wordmark-dark.svg, wordmark-light.svg
+#   png/         -> ícones 16–512 (até 32 px usa a versão simplificada) e logo-512.png
+#   ../docs/img  -> logo, nomes e favicon do site
+# Uso: ./generate.sh   (precisa de: python3 com fonttools; python3-gobject com Rsvg e cairo)
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Miolo da logo (defs + desenho), sem a tag <svg> externa
-BODY=$(sed -n '/<defs>/,/^<\/svg>/p' logo.svg | sed '$d')
+PY=${PYTHON:-python3}
+"$PY" logo.py --variante bite .
 
-cat > icon.svg <<EOF
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>WatermelonOS</title>
-  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2a22"/><stop offset="1" stop-color="#0d1511"/></linearGradient>
-  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bg)"/>
-  <g transform="translate(38 38) scale(0.85)">
-$BODY
-  </g>
-</svg>
-EOF
-
-wordmark() {  # $1 = cor do texto, $2 = arquivo
-  cat > "$2" <<EOF
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 300" width="1240" height="300">
-  <title>WatermelonOS</title>
-  <g transform="translate(10 22) scale(0.5)">
-$BODY
-  </g>
-  <text x="290" y="190" font-family="Inter, Cantarell, 'DejaVu Sans', sans-serif" font-size="128" letter-spacing="-3" fill="$1"><tspan font-weight="700">watermelon</tspan><tspan font-weight="300" fill="#e8304a">OS</tspan></text>
-</svg>
+render() {  # render <svg> <png> <largura>
+  /usr/bin/python3 - "$@" <<'EOF'
+import sys
+import cairo
+import gi
+gi.require_version("Rsvg", "2.0")
+from gi.repository import Rsvg
+src, out, w = sys.argv[1], sys.argv[2], int(sys.argv[3])
+h = Rsvg.Handle.new_from_file(src)
+_, vw, vh = h.get_intrinsic_size_in_pixels()
+H = round(w * vh / vw)
+s = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, H)
+r = Rsvg.Rectangle()
+r.x, r.y, r.width, r.height = 0, 0, w, H
+h.render_document(cairo.Context(s), r)
+s.write_to_png(out)
 EOF
 }
-wordmark "#1d1d1f" wordmark-light.svg
-wordmark "#f5f5f7" wordmark-dark.svg
-rm -f wordmark.svg
 
-docker run --rm -v "$PWD":/w -w /w alpine:3.20 sh -c '
-  apk add -q rsvg-convert font-inter >/dev/null 2>&1
-  mkdir -p png
-  for s in 16 32 48 64 128 256 512; do rsvg-convert -w $s -h $s icon.svg -o png/icon-$s.png; done
-  rsvg-convert -w 512 logo.svg -o png/logo-512.png
-  rsvg-convert preview-sheet.svg -o preview.png
-  chown -R '"$(id -u):$(id -g)"' .'
+mkdir -p png
+for s in 16 32; do render icon-small.svg "png/icon-$s.png" "$s"; done
+for s in 48 64 128 256 512; do render icon.svg "png/icon-$s.png" "$s"; done
+render logo.svg png/logo-512.png 512
+
+cp logo.svg wordmark-dark.svg wordmark-light.svg ../docs/img/
+render icon.svg ../docs/img/favicon.png 64
 echo "branding gerado"

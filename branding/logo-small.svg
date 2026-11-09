@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>WatermelonOS</title>
+  <defs>
+    <linearGradient id="wm-flesh" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff5a6e"/><stop offset="1" stop-color="#e3243f"/>
+    </linearGradient>
+    <clipPath id="wm-clip"><path d="M224.48 98.34 L53.09 317.71 A40 40 0 0 0 63.96 376.6 A372 372 0 0 0 448.04 376.6 A40 40 0 0 0 458.91 317.71 L287.52 98.34 A40 40 0 0 0 224.48 98.34 Z"/></clipPath>
+    <mask id="wm-bite" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+    </mask>
+  </defs>
+  <g mask="url(#wm-bite)">
+    <g clip-path="url(#wm-clip)">
+      <circle cx="256" cy="58" r="376" fill="#17703a"/>
+      <circle cx="256" cy="58" r="308.76" fill="#c9f2bd"/>
+      <circle cx="256" cy="58" r="288.3" fill="url(#wm-flesh)"/>
+      <g fill="#24130f"><path transform="translate(303.24 262.62) rotate(13)" d="M0 -32.400000000000006 C9.652500000000002 -14.580000000000004 17.55 4.86 17.55 13.608000000000002 A17.55 16.6725 0 0 1 -17.55 13.608000000000002 C-17.55 4.86 -9.652500000000002 -14.580000000000004 0 -32.400000000000006 Z"/><path transform="translate(208.76 262.62) rotate(-13)" d="M0 -32.400000000000006 C9.652500000000002 -14.580000000000004 17.55 4.86 17.55 13.608000000000002 A17.55 16.6725 0 0 1 -17.55 13.608000000000002 C-17.55 4.86 -9.652500000000002 -14.580000000000004 0 -32.400000000000006 Z"/><path transform="translate(256 188) rotate(0)" d="M0 -30.0 C8.9375 -13.5 16.25 4.5 16.25 12.6 A16.25 15.4375 0 0 1 -16.25 12.6 C-16.25 4.5 -8.9375 -13.5 0 -30.0 Z"/></g>
+      
+    </g>
+    <path d="M224.48 98.34 L53.09 317.71 A40 40 0 0 0 63.96 376.6 A372 372 0 0 0 448.04 376.6 A40 40 0 0 0 458.91 317.71 L287.52 98.34 A40 40 0 0 0 224.48 98.34 Z" fill="none" stroke="#0f5229" stroke-opacity=".35" stroke-width="3"/>
+  </g>
+</svg>

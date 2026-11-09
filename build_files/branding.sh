@@ -6,7 +6,7 @@ set -euxo pipefail
 B=/branding                 # pasta branding/ do repositório (montada no build)
 SHARE=/usr/share/watermelon
 mkdir -p "$SHARE"
-cp "$B"/logo.svg "$B"/icon.svg "$B"/wordmark-light.svg "$B"/wordmark-dark.svg "$SHARE"/
+cp "$B"/logo.svg "$B"/logo-small.svg "$B"/icon.svg "$B"/wordmark-light.svg "$B"/wordmark-dark.svg "$SHARE"/
 
 dnf -y install librsvg2-tools   # rsvg-convert: gera os PNGs no tamanho que cada lugar pede
 svg2png() { rsvg-convert -w "$2" -h "$3" -a "$1" -o "$4"; }   # arquivo largura altura destino
@@ -17,7 +17,8 @@ svg2png "$B/wordmark-light.svg" 620 150 "$SHARE/wordmark-light.png"
 # ---------------------------------------------------------------- ícone do sistema
 for s in 16 22 24 32 48 64 96 128 256 512; do
   d=/usr/share/icons/hicolor/${s}x${s}/apps
-  mkdir -p "$d" && svg2png "$B/logo.svg" "$s" "$s" "$d/watermelon-logo.png"
+  src="$B/logo.svg"; ((s <= 32)) && src="$B/logo-small.svg"   # versão simplificada nos tamanhos pequenos
+  mkdir -p "$d" && svg2png "$src" "$s" "$s" "$d/watermelon-logo.png"
 done
 install -Dm644 "$B/logo.svg" /usr/share/icons/hicolor/scalable/apps/watermelon-logo.svg
 install -Dm644 "$B/icon.svg" /usr/share/icons/hicolor/scalable/apps/watermelon-icon.svg
